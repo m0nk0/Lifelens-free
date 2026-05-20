@@ -11,15 +11,11 @@ Future<void> main() async {
 class LifeLensApp extends StatelessWidget {
   final List<CameraDescription> cameras;
   const LifeLensApp({super.key, required this.cameras});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        primaryColor: const Color(0xFF00D4AA),
-        scaffoldBackgroundColor: const Color(0xFF0F1115),
-      ),
+      theme: ThemeData.dark().copyWith(primaryColor: const Color(0xFF00D4AA), scaffoldBackgroundColor: const Color(0xFF0F1115)),
       home: WelcomeScreen(cameras: cameras),
     );
   }
