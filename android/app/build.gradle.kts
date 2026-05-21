@@ -6,8 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.lifelens"
-    compileSdk = 36
-    
+    compileSdk = 36 // ✅ Возвращаем стабильный 34
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -22,35 +22,15 @@ android {
         minSdk = flutter.minSdkVersion
         targetSdk = 34
         versionCode = 1
-        versionName = "2.1.0"
-        
-        ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-        }
+        versionName = "2.3.0"
     }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-        debug {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
-    
-    packagingOptions {
-        jniLibs {
-            useLegacyPackaging = true
+            // Временно отключаем минификацию для стабильности
+            isMinifyEnabled = false 
+            isShrinkResources = false
         }
     }
 }

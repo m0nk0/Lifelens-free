@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'health_form.dart';
 import 'history_screen.dart';
-import 'age_estimator.dart'; // ✅ Модель включена
+import 'age_estimator.dart';
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -55,17 +55,15 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
     if (mounted) setState(() {});
   }
 
-  /// ✅ Реальная загрузка модели
   Future<void> _loadModel() async {
-    try {
-      await AgeEstimator.loadModel();
-    } catch (e) {
-      debugPrint('⚠️ Ошибка загрузки TFLite: $e');
-    }
+    try { await AgeEstimator.loadModel(); } 
+    catch (e) { debugPrint('⚠️ Ошибка загрузки TFLite: $e'); }
   }
 
   Future<void> _analyzeFace() async {
+    if (_isProcessing) return;
     HapticFeedback.mediumImpact();
+    
     _isProcessing = true;
     _isScanning = true;
     _status = "📸 Делаю снимок...";
@@ -84,31 +82,29 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       if (!mounted) return;
       if (faces.isEmpty) {
         _status = "🔍 Лицо не найдено. Попробуйте ещё раз.";
-        _isScanning = false;
-        _scanController.reset();
+        _isScanning = false; 
+        _scanController.reset(); 
         setState(() {});
         return;
       }
 
       final face = faces.first;
       final boundingBox = [
-        face.boundingBox.left.toDouble(),
-        face.boundingBox.top.toDouble(),
-        face.boundingBox.width.toDouble(),
-        face.boundingBox.height.toDouble(),
+        face.boundingBox.left.toDouble(), face.boundingBox.top.toDouble(),
+        face.boundingBox.width.toDouble(), face.boundingBox.height.toDouble(),
       ];
       
-      _status = "🧮 Вычисляю возраст...";
+      _status = "🧮 Вычисляю возраст и освещение...";
       if (mounted) setState(() {});
       
-      // ✅ Реальное предсказание возраста
-      int predictedAge = 35; // fallback
+      int predictedAge = 35;
+      double brightness = 0.5;
       try {
         predictedAge = await AgeEstimator.predictAge(File(photo.path), boundingBox);
-        debugPrint('🎯 TFLite предсказал: $predictedAge лет');
+        brightness = await AgeEstimator.getFaceBrightness(File(photo.path), boundingBox);
+        debugPrint('🎯 TFLite: $predictedAge лет | Освещённость: ${(brightness * 100).toInt()}%');
       } catch (e) {
         debugPrint('⚠️ Ошибка инференса: $e');
-        // Если ошибка — используем fallback 35
       }
 
       HapticFeedback.lightImpact();
@@ -117,37 +113,49 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       await Future.delayed(const Duration(milliseconds: 800));
       if (!mounted) return;
 
-      _isScanning = false;
+      _isScanning = false; 
       _scanController.reset();
-      _showResult(predictedAge);
+      _showResult(predictedAge, brightness);
     } catch (e) {
       debugPrint("⚠️ Error: $e");
-      if (mounted) {
-        _status = "❌ Ошибка анализа";
-        _isScanning = false;
-        _scanController.reset();
-        setState(() {});
+      if (mounted) { 
+        _status = "❌ Ошибка анализа"; 
+        _isScanning = false; 
+        _scanController.reset(); 
+        setState(() {}); 
       }
-    } finally {
-      _isProcessing = false;
+    } finally { 
+      _isProcessing = false; 
     }
   }
 
-  void _showResult(int age) {
+  // 🔧 FIX: Метод сброса состояния камеры
+  void _resetCameraState() {
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      _isScanning = false;
+      _status = "Поместите лицо в рамку и нажмите кнопку";
+      _scanController.reset();
+    });
+  }
+
+  void _showResult(int age, double brightness) {
+    // 🔧 FIX: После возврата из результата сбрасываем состояние
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => HealthForm(faceAgeEstimate: age),
+        builder: (_) => HealthForm(faceAgeEstimate: age, faceBrightness: brightness),
       ),
-    );
+    ).then((_) => _resetCameraState());
   }
 
   @override
   void dispose() {
-    _scanController.dispose();
-    _controller?.dispose();
-    _detector.close();
-    AgeEstimator.close(); // ✅ Очистка модели
+    _scanController.dispose(); 
+    _controller?.dispose(); 
+    _detector.close(); 
+    AgeEstimator.close(); 
     super.dispose();
   }
 
@@ -165,24 +173,18 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Превью камеры
           CameraPreview(_controller!),
           
-          // 2. Рамка в режиме ожидания
           if (!_isScanning)
             Positioned.fill(
               child: Center(
                 child: CustomPaint(
                   size: const Size(450, 560),
-                  painter: CenteredScannerPainter(
-                    isScanning: false,
-                    scanProgress: 0,
-                  ),
+                  painter: CenteredScannerPainter(isScanning: false, scanProgress: 0),
                 ),
               ),
             ),
           
-          // 3. Оверлей сканирования
           if (_isScanning)
             AnimatedBuilder(
               animation: _scanController,
@@ -193,56 +195,38 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                       child: Center(
                         child: CustomPaint(
                           size: const Size(450, 560),
-                          painter: CenteredScannerPainter(
-                            isScanning: true,
-                            scanProgress: _scanProgress,
-                          ),
+                          painter: CenteredScannerPainter(isScanning: true, scanProgress: _scanProgress),
                         ),
                       ),
                     ),
                     _TermLog(
                       isScanning: _isScanning,
                       terms: const [
-                        "Анализ микрорельефа",
-                        "Оценка тургора кожи",
-                        "Картирование морщин",
-                        "Сканирование радужки",
-                        "Анализ сосудистой сетки",
-                        "Измерение пигментации",
-                        "Детекция маркеров усталости",
-                        "Оценка симметрии лица",
+                        "Анализ микрорельефа", "Оценка тургора кожи", "Картирование морщин",
+                        "Сканирование радужки", "Анализ сосудистой сетки", "Измерение пигментации",
+                        "Детекция маркеров усталости", "Оценка симметрии лица",
                       ],
                       side: 'left',
                     ),
                     _TermLog(
                       isScanning: _isScanning,
                       terms: const [
-                        "Анализ тонуса мышц",
-                        "Расчет индекса гидратации",
-                        "Анализ периорбитальной зоны",
-                        "Оценка коллагеновой сетки",
-                        "Термография тканей",
-                        "Анализ микроциркуляции",
-                        "Детекция акне-маркеров",
-                        "Расчет биометрических точек",
+                        "Анализ тонуса мышц", "Расчет индекса гидратации", "Анализ периорбитальной зоны",
+                        "Оценка коллагеновой сетки", "Термография тканей", "Анализ микроциркуляции",
+                        "Детекция акне-маркеров", "Расчет биометрических точек",
                       ],
                       side: 'right',
                     ),
                     Positioned.fill(
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.4),
-                      ),
+                      child: Container(color: Colors.black.withValues(alpha: 0.4)),
                     ),
                   ],
                 );
               },
             ),
           
-          // 4. Статус сверху
           Positioned(
-            top: 60,
-            left: 20,
-            right: 20,
+            top: 60, left: 20, right: 20,
             child: Container(
               padding: const EdgeInsets.all(12.0),
               decoration: BoxDecoration(
@@ -252,26 +236,16 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
               child: Text(
                 _status,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
               ),
             ),
           ),
           
-          // 5. Подсказка снизу (в режиме ожидания)
           if (!_isProcessing)
             Positioned(
-              bottom: 140,
-              left: 20,
-              right: 20,
+              bottom: 140, left: 20, right: 20,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 10.0,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
                 decoration: BoxDecoration(
                   color: Colors.black38,
                   borderRadius: BorderRadius.circular(10.0),
@@ -279,54 +253,33 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 child: const Text(
                   "💡 Для точности держите лицо ровно, смотрите в камеру, уберите волосы с лба.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                 ),
               ),
             ),
           
-          // 6. Кнопки управления
           Positioned(
-            bottom: 50,
-            left: 0,
-            right: 0,
+            bottom: 50, left: 0, right: 0,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Кнопка "История"
                 OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const HistoryScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.history, color: Color(0xFF00D4AA)),
-                  label: const Text(
-                    "История",
-                    style: TextStyle(color: Color(0xFF00D4AA)),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
                   ),
+                  icon: const Icon(Icons.history, color: Color(0xFF00D4AA)),
+                  label: const Text("История", style: TextStyle(color: Color(0xFF00D4AA))),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF00D4AA)),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24.0,
-                      vertical: 14.0,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
                   ),
                 ),
                 const SizedBox(width: 16.0),
-                // Кнопка "Анализ"
                 ElevatedButton.icon(
                   onPressed: _isProcessing ? null : _analyzeFace,
                   icon: Icon(
-                    _isProcessing
-                        ? Icons.hourglass_empty
-                        : Icons.health_and_safety,
+                    _isProcessing ? Icons.hourglass_empty : Icons.health_and_safety,
                     color: Colors.black,
                   ),
                   label: Text(
@@ -335,10 +288,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00D4AA),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32.0,
-                      vertical: 16.0,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
                   ),
                 ),
               ],
@@ -355,18 +305,13 @@ class CenteredScannerPainter extends CustomPainter {
   final bool isScanning;
   final double scanProgress;
   
-  const CenteredScannerPainter({
-    required this.isScanning,
-    required this.scanProgress,
-  });
+  const CenteredScannerPainter({required this.isScanning, required this.scanProgress});
   
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
     const cornerSize = 36.0;
-    final borderColor = isScanning
-        ? const Color(0xFF00D4AA)
-        : const Color(0x9900D4AA);
+    final borderColor = isScanning ? const Color(0xFF00D4AA) : const Color(0x9900D4AA);
 
     final cornerPaint = Paint()
       ..color = borderColor
@@ -391,7 +336,6 @@ class CenteredScannerPainter extends CustomPainter {
     canvas.drawPath(path, cornerPaint);
 
     if (isScanning) {
-      // Свечение
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(20.0)),
         Paint()
@@ -400,15 +344,10 @@ class CenteredScannerPainter extends CustomPainter {
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
       );
       
-      // Линия сканирования
       final scanY = rect.top + (size.height * scanProgress);
       const scanHeight = 8.0;
       final grad = LinearGradient(
-        colors: const [
-          Color(0x0000D4AA),
-          Color(0xFF00D4AA),
-          Color(0x0000D4AA),
-        ],
+        colors: const [Color(0x0000D4AA), Color(0xFF00D4AA), Color(0x0000D4AA)],
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
       );
