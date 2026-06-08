@@ -6,31 +6,40 @@ plugins {
 
 android {
     namespace = "com.example.lifelens"
-    compileSdk = 36 // ✅ Возвращаем стабильный 34
-
+    compileSdk = 36  // ✅ Поднимаем до 36 (требуют плагины)
+    
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-
+    
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
-
+    
     defaultConfig {
         applicationId = "com.example.lifelens"
         minSdk = flutter.minSdkVersion
         targetSdk = 34
         versionCode = 1
-        versionName = "2.3.0"
+        versionName = "2.1.0"
+        
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
-
+    
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
-            // Временно отключаем минификацию для стабильности
-            isMinifyEnabled = false 
+            isMinifyEnabled = false
             isShrinkResources = false
+        }
+    }
+    
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }

@@ -1,22 +1,32 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'welcome_screen.dart';
+import 'splash_screen.dart'; // ✅ Импортируем экран заставки
 
-Future<void> main() async {
+// 🚀 Точка входа в приложение
+void main() {
+  // Обязательная инициализация Flutter
   WidgetsFlutterBinding.ensureInitialized();
-  final cameras = await availableCameras();
-  runApp(LifeLensApp(cameras: cameras));
+  
+  // Запускаем приложение
+  runApp(const LifeLensApp());
 }
 
 class LifeLensApp extends StatelessWidget {
-  final List<CameraDescription> cameras;
-  const LifeLensApp({super.key, required this.cameras});
+  const LifeLensApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'LifeLens',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(primaryColor: const Color(0xFF00D4AA), scaffoldBackgroundColor: const Color(0xFF0F1115)),
-      home: WelcomeScreen(cameras: cameras),
+      
+      // 🎨 Твоя тема (тёмный фон + бирюзовый акцент)
+      theme: ThemeData.dark().copyWith(
+        primaryColor: const Color(0xFF00D4AA),
+        scaffoldBackgroundColor: const Color(0xFF0F1115),
+      ),
+
+      // 🖼️ Главный экран — теперь это Splash Screen
+      home: const SplashScreen(), 
     );
   }
 }

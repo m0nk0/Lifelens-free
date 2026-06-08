@@ -1,5 +1,5 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
 import 'camera_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -8,153 +8,186 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    
+    // 📐 Четкое разделение: Телефон или Планшет
+    final isTablet = size.width > 600;
+    
+    //  Настройка размеров в зависимости от устройства
+    final titleSize = isTablet ? 48.0 : 28.0;       // Заголовок
+    final subtitleSize = isTablet ? 20.0 : 14.0;     // Подзаголовок
+    final stepTitleSize = isTablet ? 24.0 : 16.0;    // Шаги (заголовки)
+    final stepDescSize = isTablet ? 16.0 : 12.0;     // Шаги (описание)
+    final buttonSize = isTablet ? 20.0 : 16.0;       // Кнопка
+    final iconSize = isTablet ? 64.0 : 40.0;         // Иконка сверху
+    
+    final padding = isTablet ? 40.0 : 20.0;          // Отступы по краям
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F1115),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 20),
-              // Логотип / Иконка
-              Container(
-                height: 100,
-                width: 100,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00D4AA).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF00D4AA).withValues(alpha: 0.2),
-                      blurRadius: 20,
-                      spreadRadius: 4,
-                    )
-                  ],
-                ),
-                child: const Icon(Icons.biotech, color: Color(0xFF00D4AA), size: 56),
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                'LifeLens',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 44,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Узнайте свой истинный биологический возраст за 2 минуты',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 20,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 48),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: EdgeInsets.all(padding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
 
-              // Шаги
-              _buildStep(1, 'Сканирование лица', 'ИИ-камера анализирует микрорельеф кожи, тонус мышц и маркеры усталости'),
-              _buildStep(2, 'Анкета здоровья', 'Учтём ваш образ жизни, качество сна, вес и уровень физической активности'),
-              _buildStep(3, 'Прогноз и рекомендации', 'Рассчитаем биологический возраст, вероятность долголетия и дадим персональный план по снижению биологического возраста'),
-
-              const SizedBox(height: 48),
-
-              // Кнопка старта
-              ElevatedButton.icon(
-                onPressed: () {
-                  final frontCamera = cameras.firstWhere(
-                    (c) => c.lensDirection == CameraLensDirection.front,
-                    orElse: () => cameras.first,
-                  );
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => CameraScreen(camera: frontCamera)),
-                  );
-                },
-                icon: const Icon(Icons.fingerprint, color: Colors.black, size: 28),
-                label: const Text(
-                  'Начать анализ',
-                  style: TextStyle(color: Colors.black, fontSize: 24, fontWeight: FontWeight.w600),
+                // 🟢 Иконка
+                Container(
+                  width: double.infinity,
+                  height: isTablet ? 120.0 : 80.0,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D4AA).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00D4AA).withValues(alpha: 0.25),
+                        blurRadius: 24,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.biotech,
+                    size: iconSize,
+                    color: const Color(0xFF00D4AA),
+                  ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00D4AA),
-                  padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 24),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-              const SizedBox(height: 24),
 
-              // Конфиденциальность
-              const Text(
-                '🔒 Все данные обрабатываются локально на вашем устройстве. Фото и анкеты не покидают телефон и не передаются третьим лицам.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 15,
-                  height: 1.5,
+                SizedBox(height: isTablet ? 30 : 20),
+
+                //  Заголовок
+                Text(
+                  'LifeLens',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 30),
-            ],
+
+                const SizedBox(height: 8),
+
+                // 📝 Подзаголовок
+                Text(
+                  'Узнайте свой истинный\nбиологический возраст за 2 минуты',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: subtitleSize,
+                    height: 1.4,
+                  ),
+                ),
+
+                SizedBox(height: isTablet ? 40 : 28),
+
+                // 1️⃣ Шаг 1
+                _buildStep('1', 'Сканирование лица', 'ИИ-камера анализирует микрорельеф кожи, тонус мышц и маркеры усталости', stepTitleSize, stepDescSize, isTablet),
+                SizedBox(height: isTablet ? 20 : 14),
+
+                // 2️⃣ Шаг 2
+                _buildStep('2', 'Анкета здоровья', 'Учтём ваш образ жизни, качество сна, вес и уровень физической активности', stepTitleSize, stepDescSize, isTablet),
+                SizedBox(height: isTablet ? 20 : 14),
+
+                // 3️ Шаг 3
+                _buildStep('3', 'Прогноз и рекомендации', 'Рассчитаем биологический возраст, вероятность долголетия и дадим персональный план', stepTitleSize, stepDescSize, isTablet),
+
+                SizedBox(height: isTablet ? 40 : 28),
+
+                // 🚀 Кнопка "Начать анализ"
+                SizedBox(
+                  width: double.infinity,
+                  height: isTablet ? 65.0 : 50.0, // Высота кнопки
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      final selectedCamera = cameras.firstWhere(
+                        (c) => c.lensDirection == CameraLensDirection.front,
+                        orElse: () => cameras.first,
+                      );
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => CameraScreen(camera: selectedCamera)),
+                      );
+                    },
+                    icon: Icon(Icons.arrow_forward, color: Colors.black, size: isTablet ? 24.0 : 18.0),
+                    label: Text(
+                      'Начать анализ',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: buttonSize,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00D4AA),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 4,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStep(int num, String title, String desc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFF00D4AA),
-              borderRadius: BorderRadius.circular(12),
+  Widget _buildStep(String num, String title, String desc, double titleSize, double descSize, bool isTablet) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: isTablet ? 50.0 : 36.0,
+          height: isTablet ? 50.0 : 36.0,
+          decoration: BoxDecoration(
+            color: const Color(0xFF00D4AA),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            num,
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: isTablet ? 24.0 : 16.0,
+              fontWeight: FontWeight.bold,
             ),
-            child: Center(
-              child: Text(
-                num.toString(),
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 24),
+          ),
+        ),
+        SizedBox(width: isTablet ? 20 : 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: titleSize,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                  ),
+              const SizedBox(height: 3),
+              Text(
+                desc,
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: descSize,
+                  height: 1.3,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  desc,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 17,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

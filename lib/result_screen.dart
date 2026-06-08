@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'bio_age_calculator.dart';
 import 'history_manager.dart';
 import 'longevity_screen.dart';
@@ -16,7 +18,6 @@ class ResultScreen extends StatefulWidget {
 }
 
 class _ResultScreenState extends State<ResultScreen> {
-  // 🔑 Ключ для области скриншота (будущий шаринг/сохранение)
   final GlobalKey _shareKey = GlobalKey();
 
   @override
@@ -25,13 +26,63 @@ class _ResultScreenState extends State<ResultScreen> {
     _saveResult();
   }
 
+  // 🔍 Проверяем: прошло ли 14+ дней с последнего сохранения?
+  Future<bool> _shouldSaveThisInterval() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastSave = prefs.getString('last_bio_save');
+    if (lastSave == null) return true;
+    
+    final lastDate = DateTime.parse(lastSave);
+    final now = DateTime.now();
+    final diff = now.difference(lastDate).inDays;
+    
+    return diff >= 14; // ✅ Интервал: не чаще 1 раза в 2 недели
+  }
+
+  // 🎁 Проверяем лояльность: трекер ≥ 80% за последние 28 дней
+  Future<Map<String, dynamic>> _checkLoyaltyBonus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    int checkedDays = 0;
+    int totalDays = 0;
+    
+    for (int i = 0; i < 28; i++) {
+      final date = now.subtract(Duration(days: i));
+      final key = 'tracker_${date.toIso8601String().split('T')[0]}';
+      final data = prefs.getString(key);
+      if (data != null) {
+        totalDays++;
+        final decoded = jsonDecode(data);
+        if (decoded.values.any((v) => v == true)) {
+          checkedDays++;
+        }
+      }
+    }
+    
+    final hasBonus = totalDays >= 20 && (checkedDays / totalDays) >= 0.8;
+    
+    return {
+      'hasBonus': hasBonus,
+      'consistency': totalDays > 0 ? (checkedDays / totalDays) : 0,
+    };
+  }
+
   Future<void> _saveResult() async {
+    final shouldSave = await _shouldSaveThisInterval();
+    if (!shouldSave) return;
+    
+    final loyalty = await _checkLoyaltyBonus();
+    
     await HistoryManager.save(ScanHistory(
       date: DateTime.now(),
       bioAge: widget.result.biologicalAge,
       chronoAge: widget.result.chronologicalAge,
       riskLevel: widget.result.riskLevel,
+      hasLoyaltyBonus: loyalty['hasBonus'],
     ));
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_bio_save', DateTime.now().toIso8601String());
   }
 
   String _getDifferenceText() {
@@ -71,7 +122,6 @@ class _ResultScreenState extends State<ResultScreen> {
           children: [
             const SizedBox(height: 30),
 
-            // 📸 Область для скриншота (RepaintBoundary)
             RepaintBoundary(
               key: _shareKey,
               child: Container(
@@ -104,14 +154,26 @@ class _ResultScreenState extends State<ResultScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      '${widget.result.biologicalAge} лет',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 64,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: _checkLoyaltyBonus(),
+                      builder: (context, snapshot) {
+                        final loyalty = snapshot.data ?? {'hasBonus': false};
+                        final displayAge = loyalty['hasBonus'] 
+                            ? widget.result.biologicalAge - 1
+                            : widget.result.biologicalAge;
+                        
+                        return Text(
+                          '$displayAge лет',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 64,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      },
                     ),
+                    
                     const SizedBox(height: 8),
                     Text(
                       _getDifferenceText(),
@@ -166,26 +228,24 @@ class _ResultScreenState extends State<ResultScreen> {
               ),
             ),
 
-            //  КНОПКИ УПРАВЛЕНИЯ (вне RepaintBoundary)
             const SizedBox(height: 20),
             const Divider(color: Colors.grey, height: 1),
             const SizedBox(height: 20),
 
-            // 🔮 Прогноз долголетия
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF00D4AA).withOpacity(0.2),
+                    const Color(0xFF00D4AA).withValues(alpha: 0.2),
                     Colors.grey[900]!,
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF00D4AA).withOpacity(0.4)),
+                border: Border.all(color: const Color(0xFF00D4AA).withValues(alpha: 0.4)),
               ),
               child: Column(
                 children: [
@@ -238,7 +298,6 @@ class _ResultScreenState extends State<ResultScreen> {
 
             const SizedBox(height: 20),
 
-            // 💡 План продления жизни (НОВЫЙ)
             ElevatedButton.icon(
               onPressed: () {
                 HapticFeedback.mediumImpact();
@@ -247,7 +306,6 @@ class _ResultScreenState extends State<ResultScreen> {
                   MaterialPageRoute(
                     builder: (_) => RecommendationsScreen(
                       result: widget.result,
-                      isPremium: false, // 🔒 Заглушка: в реальной версии — проверка подписки
                     ),
                   ),
                 );
@@ -267,7 +325,6 @@ class _ResultScreenState extends State<ResultScreen> {
 
             const SizedBox(height: 12),
 
-            // 🔬 Научная методология
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.push(
@@ -289,7 +346,6 @@ class _ResultScreenState extends State<ResultScreen> {
 
             const SizedBox(height: 24),
 
-            // 🔙 Кнопка возврата к камере
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

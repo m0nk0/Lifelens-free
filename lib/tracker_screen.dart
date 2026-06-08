@@ -1,339 +1,287 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class TrackerScreen extends StatefulWidget {
-  final List<Map<String, String>> recommendations;
-  final bool isPremium;
-
-  const TrackerScreen({
-    super.key,
-    required this.recommendations,
-    required this.isPremium,
-  });
+  // ✅ Простой конструктор без обязательных параметров
+  const TrackerScreen({super.key});
 
   @override
   State<TrackerScreen> createState() => _TrackerScreenState();
 }
 
 class _TrackerScreenState extends State<TrackerScreen> {
-  final Map<String, List<bool>> _weeklyProgress = {};
+  final String _todayKey = DateTime.now().toIso8601String().split('T')[0];
+  
+  // ✅ Список привычек (можно менять)
+  final List<Map<String, dynamic>> _habits = [
+    {'id': 'water', 'title': '💧 Пил воду (1.5-2л)', 'checked': false},
+    {'id': 'sleep', 'title': '😴 Сон 7-8 часов', 'checked': false},
+    {'id': 'skin', 'title': '🧴 Уход за кожей', 'checked': false},
+    {'id': 'nutrition', 'title': '🥗 Правильное питание', 'checked': false},
+    {'id': 'walk', 'title': '🚶 Прогулка 30+ мин', 'checked': false},
+    {'id': 'scan', 'title': '📸 Скан лица', 'checked': false},
+  ];
+
   int _streak = 0;
-  DateTime? _lastVisit;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _initData();
-    _checkStreak();
+    _loadData();
   }
 
-  void _initData() {
-    for (final rec in widget.recommendations) {
-      _weeklyProgress[rec['id']!] = List.generate(7, (i) => i < 3);
-    }
-  }
-
-  void _checkStreak() {
-    final now = DateTime.now();
-    final last = _lastVisit;
+  // 🔽 Загрузка данных
+  Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
     
-    if (last == null) {
-      _streak = 1;
-    } else {
-      final diff = now.difference(last).inDays;
-      if (diff <= 1) {
-        _streak += 1;
-      } else if (diff > 2) {
-        _streak = 1;
+    // Загружаем галочки за сегодня
+    final todayData = prefs.getString('tracker_$_todayKey');
+    if (todayData != null) {
+      final Map<String, dynamic> decoded = jsonDecode(todayData);
+      for (var habit in _habits) {
+        if (decoded.containsKey(habit['id'])) {
+          habit['checked'] = decoded[habit['id']];
+        }
       }
     }
-    _lastVisit = now;
+
+    // Считаем серию дней (streak)
+    _streak = 0;
+    DateTime checkDate = DateTime.now();
+    while (true) {
+      final key = 'tracker_${checkDate.toIso8601String().split('T')[0]}';
+      final data = prefs.getString(key);
+      if (data != null) {
+        final Map<String, dynamic> decoded = jsonDecode(data);
+        final bool anyChecked = decoded.values.any((v) => v == true);
+        if (anyChecked) {
+          _streak++;
+          checkDate = checkDate.subtract(const Duration(days: 1));
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  String _getMotivationMessage() {
-    if (_streak >= 7) return '🔥 Неделя подряд! Вы меняете траекторию старения.';
-    if (_streak >= 3) return '⭐ Отличный ритм! Каждая привычка — +0.3 года жизни.';
-    if (_streak == 1) return '🚀 Начало положено! Завтра будет легче.';
-    return '💪 Вернитесь сегодня — ваш биовозраст ждёт улучшений.';
+  // 🔼 Сохранение данных
+  Future<void> _saveData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final Map<String, bool> data = {};
+    for (var h in _habits) {
+      data[h['id']] = h['checked'];
+    }
+    await prefs.setString('tracker_$_todayKey', jsonEncode(data));
+  }
+
+  void _toggleHabit(int index) {
+    setState(() {
+      _habits[index]['checked'] = !_habits[index]['checked'];
+    });
+    _saveData();
+  }
+
+  String _getMotivation(double progress) {
+    if (progress == 0) return 'Начни с малого. Один шаг к лучшей версии себя! 🌱';
+    if (progress < 0.5) return 'Хорошее начало! Продолжай в том же духе 💪';
+    if (progress < 1.0) return 'Почти идеально! Осталось чуть-чуть 🎯';
+    return 'Легенда! Все привычки выполнены. Ты крут! 🏆';
   }
 
   @override
   Widget build(BuildContext context) {
-    final today = DateTime.now();
-    final weekday = today.weekday % 7;
+    final completedCount = _habits.where((h) => h['checked']).length;
+    final progress = completedCount / _habits.length;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0F1115),
       appBar: AppBar(
-        title: const Text('Трекер привычек'),
         backgroundColor: const Color(0xFF0F1115),
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-      ),
-      backgroundColor: const Color(0xFF0F1115),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF00D4AA).withOpacity(0.2),
-                  Colors.grey[900]!,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Column(
+        title: const Text('Ежедневный трекер', 
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.local_fire_department, color: Colors.orange, size: 24),
-                    const SizedBox(width: 8),
-                    Text(
-                      '$_streak дней подряд 🔥',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _getMotivationMessage(),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                ),
+                const Icon(Icons.local_fire_department, color: Colors.orange, size: 20),
+                const SizedBox(width: 6),
+                Text('$_streak дн.', 
+                  style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
-
-          Container(
-            padding: const EdgeInsets.all(12),
-            color: Colors.grey[900],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].asMap().entries.map((entry) {
-                final idx = entry.key;
-                final day = entry.value;
-                final isToday = idx == weekday;
-                return Column(
-                  children: [
-                    Text(day, style: TextStyle(color: isToday ? const Color(0xFF00D4AA) : Colors.grey[600], fontSize: 11)),
-                    const SizedBox(height: 4),
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: isToday ? const Color(0xFF00D4AA) : Colors.grey[800],
-                        shape: BoxShape.circle,
-                        border: Border.all(color: isToday ? Colors.white : Colors.transparent, width: 2),
-                      ),
-                      child: Icon(
-                        Icons.check,
-                        size: 16,
-                        color: isToday ? Colors.black : Colors.transparent,
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: widget.recommendations.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final rec = widget.recommendations[index];
-                final id = rec['id']!;
-                final progress = _weeklyProgress[id] ?? List.filled(7, false);
-
-                return Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[800]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              rec['title']!,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          if (widget.isPremium)
-                            IconButton(
-                              icon: const Icon(Icons.notifications_none, color: Color(0xFF00D4AA), size: 20),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('🔔 Напоминание установлено на 20:00')),
-                                );
-                              },
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: List.generate(7, (i) {
-                          final isDone = progress[i];
-                          final isPast = i < weekday;
-                          return GestureDetector(
-                            onTap: widget.isPremium && isPast 
-                                ? () => setState(() => progress[i] = !isDone) 
-                                : null,
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: isDone 
-                                    ? const Color(0xFF00D4AA) 
-                                    : (isPast ? Colors.grey[800] : Colors.grey[850]),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isDone ? Colors.black : Colors.transparent,
-                                  width: isDone ? 2 : 0,
-                                ),
-                              ),
-                              child: isDone 
-                                  ? const Icon(Icons.check, size: 18, color: Colors.black) 
-                                  : null,
-                            ),
-                          );
-                        }),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${progress.where((v) => v).length}/7 дней',
-                            style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                          ),
-                          if (!widget.isPremium)
-                            TextButton(
-                              onPressed: () => _showPremiumDialog(context),
-                              child: const Text(
-                                '🔓 Редактировать',
-                                style: TextStyle(color: Color(0xFF00D4AA), fontSize: 12),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-
-          if (_streak >= 3)
-            Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00D4AA).withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF00D4AA).withOpacity(0.4)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.card_giftcard, color: Color(0xFF00D4AA), size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '🎁 Бонус за постоянство!',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          widget.isPremium 
-                              ? 'Открыт доступ к расширенной аналитике старения' 
-                              : 'Разблокируйте премиум, чтобы получить персональный отчёт',
-                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!widget.isPremium)
-                    ElevatedButton(
-                      onPressed: () => _showPremiumDialog(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00D4AA),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      ),
-                      child: const Text('Получить', style: TextStyle(color: Colors.black, fontSize: 12)),
-                    ),
-                ],
-              ),
-            ),
         ],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00D4AA)))
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 📊 Прогресс-кольцо
+                    Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 140,
+                            height: 140,
+                            child: CircularProgressIndicator(
+                              value: progress,
+                              strokeWidth: 12,
+                              backgroundColor: Colors.grey[800],
+                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00D4AA)),
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${(progress * 100).toInt()}%',
+                                style: const TextStyle(
+                                  color: Colors.white, 
+                                  fontSize: 32, 
+                                  fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                '$completedCount из ${_habits.length}',
+                                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // 💬 Мотивация
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1C21),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFF00D4AA).withValues(alpha: 0.2)),
+                      ),
+                      child: Text(
+                        _getMotivation(progress),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white, 
+                          fontSize: 15, 
+                          height: 1.4),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ✅ Список привычек
+                    ..._habits.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final habit = entry.value;
+                      return _HabitTile(
+                        title: habit['title'],
+                        isChecked: habit['checked'],
+                        onTap: () => _toggleHabit(index),
+                      );
+                    }),
+
+                    const SizedBox(height: 32),
+                    Text(
+          '📅 ${_formatDate(DateTime.now())}',
+                   textAlign: TextAlign.center,
+                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
-  void _showPremiumDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0F1115),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('🔓 LifeLens Premium', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+  String _formatDate(DateTime date) {
+    const months = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+}
+
+// 🧩 Виджет одной привычки
+class _HabitTile extends StatelessWidget {
+  final String title;
+  final bool isChecked;
+  final VoidCallback onTap;
+
+  const _HabitTile({
+    required this.title,
+    required this.isChecked,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isChecked 
+              ? const Color(0xFF00D4AA).withValues(alpha: 0.15) 
+              : const Color(0xFF1A1C21),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isChecked 
+                ? const Color(0xFF00D4AA) 
+                : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
           children: [
-            const Text('Разблокируйте полный доступ:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 10),
-            ...[
-              '✅ Редактирование прогресса',
-              '✅ Напоминания о привычках',
-              '✅ Расширенная аналитика',
-              '✅ Персональные отчёты в PDF',
-            ].map((feature) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Color(0xFF00D4AA), size: 16),
-                  const SizedBox(width: 8),
-                  Text(feature, style: TextStyle(color: Colors.grey[400], fontSize: 13)),
-                ],
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isChecked 
+                    ? const Color(0xFF00D4AA) 
+                    : Colors.grey[800],
               ),
-            )),
+              child: isChecked
+                  ? const Icon(Icons.check, color: Colors.black, size: 18)
+                  : null,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: isChecked ? Colors.white : Colors.grey[300],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  decoration: isChecked ? TextDecoration.lineThrough : null,
+                  decorationColor: Colors.grey[500],
+                ),
+              ),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Позже', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('💡 В реальной версии здесь откроется оплата')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00D4AA)),
-            child: const Text('Разблокировать за \$2.99/мес', style: TextStyle(color: Colors.black)),
-          ),
-        ],
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'health_form.dart';
 import 'history_screen.dart';
 import 'age_estimator.dart';
+import 'recommendations_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -102,7 +103,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       try {
         predictedAge = await AgeEstimator.predictAge(File(photo.path), boundingBox);
         brightness = await AgeEstimator.getFaceBrightness(File(photo.path), boundingBox);
-        debugPrint('🎯 TFLite: $predictedAge лет | Освещённость: ${(brightness * 100).toInt()}%');
+        debugPrint('✅ TFLite: $predictedAge лет | Освещённость: ${(brightness * 100).toInt()}%');
       } catch (e) {
         debugPrint('⚠️ Ошибка инференса: $e');
       }
@@ -129,7 +130,6 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
     }
   }
 
-  // 🔧 FIX: Метод сброса состояния камеры
   void _resetCameraState() {
     if (!mounted) return;
     setState(() {
@@ -141,7 +141,6 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   }
 
   void _showResult(int age, double brightness) {
-    // 🔧 FIX: После возврата из результата сбрасываем состояние
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -163,23 +162,59 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     if (_controller == null || !_controller!.value.isInitialized) {
       return const Scaffold(
+        backgroundColor: Color(0xFF0F1115),
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFF00D4AA)),
         ),
       );
     }
 
+    final size = MediaQuery.of(context).size;
+    final isPhone = size.shortestSide < 600;
+
     return Scaffold(
+      backgroundColor: const Color(0xFF0F1115),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          CameraPreview(_controller!),
+          // 📸 КАМЕРА: Умный расчёт размеров без искажений
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Пропорции камеры (в портретном режиме width/height меняются местами)
+              final previewWidth = _controller!.value.previewSize!.height;
+              final previewHeight = _controller!.value.previewSize!.width;
+              final previewRatio = previewWidth / previewHeight;
+
+              // Вычисляем реальные размеры, чтобы заполнить экран без искажений
+              final boxWidth = constraints.maxWidth;
+              final boxHeight = constraints.maxHeight;
+              final boxRatio = boxWidth / boxHeight;
+              
+              double renderWidth, renderHeight;
+
+              if (boxRatio > previewRatio) {
+                renderWidth = boxWidth;
+                renderHeight = boxWidth / previewRatio;
+              } else {
+                renderHeight = boxHeight;
+                renderWidth = boxHeight * previewRatio;
+              }
+
+              return Center(
+                child: SizedBox(
+                  width: renderWidth,
+                  height: renderHeight,
+                  child: CameraPreview(_controller!),
+                ),
+              );
+            },
+          ),
           
           if (!_isScanning)
             Positioned.fill(
               child: Center(
                 child: CustomPaint(
-                  size: const Size(450, 560),
+                  size: isPhone ? Size(size.width * 0.85, size.height * 0.45) : const Size(450, 560),
                   painter: CenteredScannerPainter(isScanning: false, scanProgress: 0),
                 ),
               ),
@@ -194,7 +229,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                     Positioned.fill(
                       child: Center(
                         child: CustomPaint(
-                          size: const Size(450, 560),
+                          size: isPhone ? Size(size.width * 0.85, size.height * 0.45) : const Size(450, 560),
                           painter: CenteredScannerPainter(isScanning: true, scanProgress: _scanProgress),
                         ),
                       ),
@@ -258,24 +293,43 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
               ),
             ),
           
+          // 🔘 3 КНОПКИ СНИЗУ
           Positioned(
-            bottom: 50, left: 0, right: 0,
+            bottom: isPhone ? 24 : 50,
+            left: 0,
+            right: 0,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                // 1. История
                 OutlinedButton.icon(
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                    MaterialPageRoute(builder: (_) => HistoryScreen()),
                   ),
                   icon: const Icon(Icons.history, color: Color(0xFF00D4AA)),
                   label: const Text("История", style: TextStyle(color: Color(0xFF00D4AA))),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF00D4AA)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
                   ),
                 ),
-                const SizedBox(width: 16.0),
+                
+                // 2. ✅ Пропустить (Новая кнопка)
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => RecommendationsScreen(result: null)),
+                  ),
+                  icon: const Icon(Icons.forward, color: Color(0xFF00D4AA)),
+                  label: const Text("Пропустить", style: TextStyle(color: Color(0xFF00D4AA))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF00D4AA)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
+                  ),
+                ),
+
+                // 3. Анализ (Главная кнопка)
                 ElevatedButton.icon(
                   onPressed: _isProcessing ? null : _analyzeFace,
                   icon: Icon(
@@ -283,12 +337,12 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                     color: Colors.black,
                   ),
                   label: Text(
-                    _isProcessing ? "Анализ..." : "Оценить биовозраст",
+                    _isProcessing ? "Анализ..." : "Оценить",
                     style: const TextStyle(color: Colors.black),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00D4AA),
-                    padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
                   ),
                 ),
               ],
@@ -300,7 +354,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   }
 }
 
-// 🎨 Холст рамки
+//  Холст рамки
 class CenteredScannerPainter extends CustomPainter {
   final bool isScanning;
   final double scanProgress;
