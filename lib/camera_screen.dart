@@ -26,6 +26,8 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   bool _isScanning = false;
   String _status = "Поместите лицо в рамку и нажмите кнопку";
   
+  XFile? _capturedPhoto; // ✅ Снимок для стоп-кадра
+  
   double get _scanProgress => _scanController.value;
 
   @override
@@ -66,12 +68,15 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
     HapticFeedback.mediumImpact();
     
     _isProcessing = true;
-    _isScanning = true;
     _status = "📸 Делаю снимок...";
     if (mounted) setState(() {});
 
     try {
+      // ✅ СРАЗУ делаем снимок (стоп-кадр)
       final photo = await _controller!.takePicture();
+      _capturedPhoto = photo; // ✅ Сохраняем для отображения
+      
+      _isScanning = true;
       _status = "🔍 Анализирую...";
       if (mounted) setState(() {});
 
@@ -84,6 +89,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       if (faces.isEmpty) {
         _status = "🔍 Лицо не найдено. Попробуйте ещё раз.";
         _isScanning = false; 
+        _capturedPhoto = null; // ✅ Очищаем снимок
         _scanController.reset(); 
         setState(() {});
         return;
@@ -100,10 +106,14 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       
       int predictedAge = 35;
       double brightness = 0.5;
+      double rawModelOutput = 0.5; // ✅ Сырой вывод модели
+      
       try {
-        predictedAge = await AgeEstimator.predictAge(File(photo.path), boundingBox);
+        // ✅ Получаем сырой вывод модели (калибровка будет в калькуляторе)
+        rawModelOutput = await AgeEstimator.predictAgeRaw(File(photo.path), boundingBox);
+        predictedAge = (rawModelOutput * 100).round(); // временно декодируем
         brightness = await AgeEstimator.getFaceBrightness(File(photo.path), boundingBox);
-        debugPrint('✅ TFLite: $predictedAge лет | Освещённость: ${(brightness * 100).toInt()}%');
+        debugPrint('✅ TFLite: сырой=$rawModelOutput → декодировано=$predictedAge лет | Освещённость: ${(brightness * 100).toInt()}%');
       } catch (e) {
         debugPrint('⚠️ Ошибка инференса: $e');
       }
@@ -115,13 +125,16 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       if (!mounted) return;
 
       _isScanning = false; 
+      _capturedPhoto = null; // ✅ Очищаем снимок после завершения
       _scanController.reset();
-      _showResult(predictedAge, brightness);
+      _showResult(predictedAge, brightness, rawModelOutput);
     } catch (e) {
-      debugPrint("⚠️ Error: $e");
+      debugPrint("⚠️ Ошибка: $e");
       if (mounted) { 
         _status = "❌ Ошибка анализа"; 
+        _isProcessing = false; 
         _isScanning = false; 
+        _capturedPhoto = null; // ✅ Очищаем снимок при ошибке
         _scanController.reset(); 
         setState(() {}); 
       }
@@ -136,15 +149,21 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
       _isProcessing = false;
       _isScanning = false;
       _status = "Поместите лицо в рамку и нажмите кнопку";
+      _capturedPhoto = null; // ✅ Очищаем снимок
       _scanController.reset();
     });
   }
 
-  void _showResult(int age, double brightness) {
+  // ✅ Метод принимает 3 параметра, включая rawModelOutput
+  void _showResult(int age, double brightness, double rawModelOutput) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => HealthForm(faceAgeEstimate: age, faceBrightness: brightness),
+        builder: (_) => HealthForm(
+          faceAgeEstimate: age, 
+          faceBrightness: brightness,
+          rawModelOutput: rawModelOutput, // ✅ передаём сырой вывод
+        ),
       ),
     ).then((_) => _resetCameraState());
   }
@@ -171,44 +190,74 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
 
     final size = MediaQuery.of(context).size;
     final isPhone = size.shortestSide < 600;
+    
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F1115),
-      body: Stack(
+        return Scaffold(
+      body: Container(
+        // ✅ Градиентный фон: от тёмно-синего к бирюзовому
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF0F1115), // Тёмный верх
+              Color(0xFF1A1D24), // Средний
+              Color(0x1A00D4AA), // ✅ Бирюзовый с 10% прозрачности (1A = 10% от FF) // ✅ Работает везде // Бирюзовый низ (прозрачный)
+            ],
+          ),
+        ),
+        child: Stack(
         fit: StackFit.expand,
         children: [
-          // 📸 КАМЕРА: Умный расчёт размеров без искажений
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // Пропорции камеры (в портретном режиме width/height меняются местами)
-              final previewWidth = _controller!.value.previewSize!.height;
-              final previewHeight = _controller!.value.previewSize!.width;
-              final previewRatio = previewWidth / previewHeight;
+          // 📸 КАМЕРА или СТОП-КАДР (с исправленным зеркальным отражением)
+                    _capturedPhoto != null && _isScanning
+              ? Center(
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0),
+                    child: AspectRatio(
+                      aspectRatio: 3 / 4, // ✅ ШАГ 1: те же пропорции, что и у камеры
+                      child: Image.file(
+                        File(_capturedPhoto!.path),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                )
+                            : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final previewWidth = _controller!.value.previewSize!.height;
+                    final previewHeight = _controller!.value.previewSize!.width;
+                    final previewRatio = previewWidth / previewHeight;
 
-              // Вычисляем реальные размеры, чтобы заполнить экран без искажений
-              final boxWidth = constraints.maxWidth;
-              final boxHeight = constraints.maxHeight;
-              final boxRatio = boxWidth / boxHeight;
-              
-              double renderWidth, renderHeight;
+                    final boxWidth = constraints.maxWidth;
+                    final boxHeight = constraints.maxHeight;
+                    final boxRatio = boxWidth / boxHeight;
+                    
+                    double renderWidth, renderHeight;
 
-              if (boxRatio > previewRatio) {
-                renderWidth = boxWidth;
-                renderHeight = boxWidth / previewRatio;
-              } else {
-                renderHeight = boxHeight;
-                renderWidth = boxHeight * previewRatio;
-              }
+                    if (boxRatio > previewRatio) {
+                      renderWidth = boxWidth;
+                      renderHeight = boxWidth / previewRatio;
+                    } else {
+                      renderHeight = boxHeight;
+                      renderWidth = boxHeight * previewRatio;
+                    }
+                    
+                     final maxAspectWidth = renderHeight * (3 / 4);
+                    if (renderWidth > maxAspectWidth) {
+                      renderWidth = maxAspectWidth;
+                    }
 
-              return Center(
-                child: SizedBox(
-                  width: renderWidth,
-                  height: renderHeight,
-                  child: CameraPreview(_controller!),
+                    return Center(
+                      child: SizedBox(
+                        width: renderWidth,
+                        height: renderHeight,
+                        child: CameraPreview(_controller!),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
           
           if (!_isScanning)
             Positioned.fill(
@@ -315,7 +364,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                   ),
                 ),
                 
-                // 2. ✅ Пропустить (Новая кнопка)
+                // 2. Пропустить
                 OutlinedButton.icon(
                   onPressed: () => Navigator.push(
                     context,
@@ -350,11 +399,13 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           ),
         ],
       ),
+      ),
     );
+    
   }
 }
 
-//  Холст рамки
+// Холст рамки
 class CenteredScannerPainter extends CustomPainter {
   final bool isScanning;
   final double scanProgress;

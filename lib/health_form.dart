@@ -5,7 +5,14 @@ import 'result_screen.dart';
 class HealthForm extends StatefulWidget {
   final int faceAgeEstimate;
   final double faceBrightness;
-  const HealthForm({super.key, required this.faceAgeEstimate, required this.faceBrightness});
+  final double rawModelOutput; // ✅ Новое поле: сырой вывод модели
+
+  const HealthForm({
+    super.key,
+    required this.faceAgeEstimate,
+    required this.faceBrightness,
+    required this.rawModelOutput,
+  });
 
   @override
   State<HealthForm> createState() => _HealthFormState();
@@ -31,6 +38,7 @@ class _HealthFormState extends State<HealthForm> {
       activity: _activity,
       faceAgeEstimate: widget.faceAgeEstimate,
       faceBrightness: widget.faceBrightness,
+      rawModelOutput: widget.rawModelOutput, // ✅ Передаём сырой вывод
     );
 
     Navigator.pushReplacement(
@@ -41,16 +49,14 @@ class _HealthFormState extends State<HealthForm> {
 
   @override
   Widget build(BuildContext context) {
-    // 📱 Адаптивность: определяем, планшет или телефон
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
     
-    // Настройка размеров
     final padding = isTablet ? 40.0 : 20.0;
     final titleSize = isTablet ? 32.0 : 22.0;
     final sectionSize = isTablet ? 26.0 : 18.0;
     final valueSize = isTablet ? 32.0 : 20.0;
-    final iconSize = isTablet ? 48.0 : 28.0; // Размер кнопок +/-
+    final iconSize = isTablet ? 48.0 : 28.0;
     final chipHeight = isTablet ? 60.0 : 44.0;
 
     return Scaffold(
@@ -68,30 +74,27 @@ class _HealthFormState extends State<HealthForm> {
             children: [
               _buildSection("👤 Основные данные", sectionSize),
               
-              // Возраст (Stepper)
               _buildStepper(
                 "Возраст", 
                 _age, 
                 18, 80, 
-                1.0, // Шаг
+                1.0,
                 (val) => setState(() => _age = val),
                 isTablet, valueSize, iconSize
               ),
-              // ✅ Пояснение под возрастом
-             Padding(
-             padding: EdgeInsets.only(left: isTablet ? 40 : 20, bottom: 16),
-            child: Text(
-            'Это нужно для расчета реальной разницы с биологическим возрастом и оценки вероятной продолжительности жизни.',
-            style: TextStyle(
-            color: Colors.grey[400], 
-            fontSize: isTablet ? 13 : 11, 
-            height: 1.3, 
-           fontStyle: FontStyle.italic,
-               ),
-             ),
-           ),
+              Padding(
+                padding: EdgeInsets.only(left: isTablet ? 40 : 20, bottom: 16),
+                child: Text(
+                  'Это нужно для расчета реальной разницы с биологическим возрастом и оценки вероятной продолжительности жизни.',
+                  style: TextStyle(
+                    color: Colors.grey[400], 
+                    fontSize: isTablet ? 13 : 11, 
+                    height: 1.3, 
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
 
-              // Пол (Chips)
               _buildLabel("Пол", sectionSize),
               Row(
                 children: [
@@ -108,7 +111,6 @@ class _HealthFormState extends State<HealthForm> {
               const SizedBox(height: 20),
               _buildSection("📏 Телосложение", sectionSize),
               
-              // Рост (Stepper)
               _buildStepper(
                 "Рост (см)", 
                 _height, 
@@ -118,12 +120,11 @@ class _HealthFormState extends State<HealthForm> {
                 isTablet, valueSize, iconSize
               ),
 
-              // Вес (Stepper)
               _buildStepper(
                 "Вес (кг)", 
                 _weight, 
                 40, 160, 
-                0.5, // Шаг 0.5 для точности
+                0.5,
                 (val) => setState(() => _weight = val),
                 isTablet, valueSize, iconSize
               ),
@@ -131,10 +132,8 @@ class _HealthFormState extends State<HealthForm> {
               const SizedBox(height: 20),
               _buildSection("🫁 Привычки", sectionSize),
 
-              // Курение
               _buildCheckbox("Курение", _smokes, (v) => setState(() => _smokes = v!), isTablet, sectionSize),
 
-              // Сон (Stepper)
               _buildStepper(
                 "Сон (часов)", 
                 _sleep, 
@@ -144,7 +143,6 @@ class _HealthFormState extends State<HealthForm> {
                 isTablet, valueSize, iconSize
               ),
 
-              // Активность (Chips)
               _buildLabel("Активность", sectionSize),
               Column(
                 children: [
@@ -158,7 +156,6 @@ class _HealthFormState extends State<HealthForm> {
 
               const SizedBox(height: 40),
 
-              // 🚀 Кнопка расчета
               SizedBox(
                 width: double.infinity,
                 height: isTablet ? 70.0 : 55.0,
@@ -187,8 +184,6 @@ class _HealthFormState extends State<HealthForm> {
     );
   }
 
-  // --- ВСПОМОГАТЕЛЬНЫЕ ВИДЖЕТЫ ---
-
   Widget _buildSection(String title, double fontSize) {
     return Padding(
       padding: const EdgeInsets.only(top: 12.0, bottom: 12.0),
@@ -203,7 +198,6 @@ class _HealthFormState extends State<HealthForm> {
     );
   }
 
-  // Виджет с кнопками +/-
   Widget _buildStepper(String label, double value, double min, double max, double step, Function(double) onChange, bool isTablet, double valueSize, double iconSize) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -242,7 +236,6 @@ class _HealthFormState extends State<HealthForm> {
     );
   }
 
-  // Виджет чипса (кнопки выбора)
   Widget _buildChip(String label, bool isSelected, VoidCallback onTap, double height, bool isTablet) {
     return GestureDetector(
       onTap: onTap,
@@ -267,7 +260,6 @@ class _HealthFormState extends State<HealthForm> {
     );
   }
 
-  // Виджет чекбокса
   Widget _buildCheckbox(String label, bool value, Function(bool?) onChanged, bool isTablet, double fontSize) {
     return CheckboxListTile(
       title: Text(label, style: TextStyle(color: Colors.white70, fontSize: fontSize)),

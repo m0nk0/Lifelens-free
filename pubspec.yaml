@@ -1,7 +1,7 @@
 name: lifelens
 description: Biological Age Estimator MVP
 publish_to: 'none'
-version: 2.1.0+1
+version: 2.1.1+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -10,17 +10,17 @@ dependencies:
   flutter:
     sdk: flutter
   camera: ^0.10.5+9
-  google_mlkit_face_detection: ^0.11.0
+  google_mlkit_face_detection: ^0.12.0
   shared_preferences: ^2.5.5
   tflite_flutter: ^0.11.0
   image: ^4.1.3
-  fl_chart: ^0.69.0  # ✅ Добавь эту строку
-  
+  fl_chart: ^0.69.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.1  # ✅ Добавил в dev_dependencies
 
 flutter:
   uses-material-design: true
@@ -28,3 +28,10 @@ flutter:
     - assets/models/model_age_nonq.tflite
     - assets/models/model_gender_nonq.tflite
     - assets/image/
+
+flutter_launcher_icons:  # ✅ БЕЗ ОТСТУПА — отдельный блок верхнего уровня
+  android: true
+  ios: true
+  image_path: "assets/image/logo.png"
+  adaptive_icon_foreground: "assets/image/logo.png"
+  adaptive_icon_background: "#0F1115"

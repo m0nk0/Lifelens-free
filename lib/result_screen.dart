@@ -8,6 +8,7 @@ import 'longevity_screen.dart';
 import 'methodology_screen.dart';
 import 'recommendations_screen.dart';
 import 'tracker_screen.dart';
+import 'longevity_calculator.dart';
 
 class ResultScreen extends StatefulWidget {
   final BioAgeResult result;
@@ -40,10 +41,11 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   // 🎁 Проверяем лояльность: трекер ≥ 80% за последние 28 дней
+  // ✅ Обновлён под новый формат трекера (2 задания в день)
   Future<Map<String, dynamic>> _checkLoyaltyBonus() async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
-    int checkedDays = 0;
+    int completedDays = 0;
     int totalDays = 0;
     
     for (int i = 0; i < 28; i++) {
@@ -53,37 +55,44 @@ class _ResultScreenState extends State<ResultScreen> {
       if (data != null) {
         totalDays++;
         final decoded = jsonDecode(data);
-        if (decoded.values.any((v) => v == true)) {
-          checkedDays++;
+        // ✅ Новый формат: список completed [true/false, true/false]
+        if (decoded['completed'] is List) {
+          final completedList = List<bool>.from(decoded['completed']);
+          if (completedList.every((c) => c == true)) {
+            completedDays++;
+          }
         }
       }
     }
     
-    final hasBonus = totalDays >= 20 && (checkedDays / totalDays) >= 0.8;
+    final hasBonus = totalDays >= 20 && (completedDays / totalDays) >= 0.8;
     
     return {
       'hasBonus': hasBonus,
-      'consistency': totalDays > 0 ? (checkedDays / totalDays) : 0,
+      'consistency': totalDays > 0 ? (completedDays / totalDays) : 0,
     };
   }
 
   Future<void> _saveResult() async {
-    final shouldSave = await _shouldSaveThisInterval();
-    if (!shouldSave) return;
-    
-    final loyalty = await _checkLoyaltyBonus();
-    
-    await HistoryManager.save(ScanHistory(
-      date: DateTime.now(),
-      bioAge: widget.result.biologicalAge,
-      chronoAge: widget.result.chronologicalAge,
-      riskLevel: widget.result.riskLevel,
-      hasLoyaltyBonus: loyalty['hasBonus'],
-    ));
-    
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('last_bio_save', DateTime.now().toIso8601String());
-  }
+  final shouldSave = await _shouldSaveThisInterval();
+  if (!shouldSave) return;
+  
+  final loyalty = await _checkLoyaltyBonus();
+  
+  await HistoryManager.save(ScanHistory(
+    date: DateTime.now(),
+    bioAge: widget.result.biologicalAge,
+    chronoAge: widget.result.chronologicalAge,
+    riskLevel: widget.result.riskLevel,
+    hasLoyaltyBonus: loyalty['hasBonus'],
+  ));
+  
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('last_bio_save', DateTime.now().toIso8601String());
+  
+  // ✅ НОВОЕ: Сохраняем биовозраст в историю для бонуса за улучшение
+  await LongevityCalculator.saveBioAgeToHistory(widget.result.biologicalAge);
+}
 
   String _getDifferenceText() {
     final diff = widget.result.ageDifference;
@@ -163,13 +172,35 @@ class _ResultScreenState extends State<ResultScreen> {
                             ? widget.result.biologicalAge - 1
                             : widget.result.biologicalAge;
                         
-                        return Text(
-                          '$displayAge лет',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 64,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        return Column(
+                          children: [
+                            Text(
+                              '$displayAge лет',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 64,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            // ✅ ВРЕМЕННО: плашка с калиброванным возрастом модели
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
+                              ),
+                              child: Text(
+                                ' Возраст по лицу: ${widget.result.calibratedFaceAge} лет',
+                                style: const TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -220,7 +251,7 @@ class _ResultScreenState extends State<ResultScreen> {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      ' ${DateTime.now().toString().substring(0, 10)} | lifelens.app',
+                      '📅 ${DateTime.now().toString().substring(0, 10)} | lifelens.app',
                       style: TextStyle(color: Colors.grey[700], fontSize: 10),
                     ),
                   ],

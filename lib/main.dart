@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ ДОБАВЛЕНО: для блокировки поворота
 import 'splash_screen.dart'; // ✅ Импортируем экран заставки
 
 // 🚀 Точка входа в приложение
-void main() {
+void main() async {
   // Обязательная инициализация Flutter
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // ✅ Блокируем поворот экрана — только портретная ориентация
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
   
   // Запускаем приложение
   runApp(const LifeLensApp());

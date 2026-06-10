@@ -1,3 +1,5 @@
+import 'age_estimator.dart'; // ✅ Импорт для калибровки
+
 class BioAgeResult {
   final int biologicalAge;
   final int chronologicalAge;
@@ -10,6 +12,8 @@ class BioAgeResult {
   final double bmi;
   final String activity;
   final int sleepHours;
+  
+  final int calibratedFaceAge; // ✅ Калиброванный возраст модели (для плашки)
 
   BioAgeResult({
     required this.biologicalAge,
@@ -22,25 +26,22 @@ class BioAgeResult {
     required this.bmi,
     required this.activity,
     required this.sleepHours,
+    required this.calibratedFaceAge,
   });
 }
 
 class BioAgeCalculator {
-  // ==========================================
-  // ⚙️ КОНФИГУРАЦИЯ: меняй веса и штрафы здесь
-  // ==========================================
-  static const double aiWeight = 0.65;          // Влияние ИИ на результат
-  static const double chronoWeight = 0.35;      // Компенсация паспортным возрастом
-  static const double maxAiInfluence = 8.0;     // Макс. отклонение ИИ (±N лет)
+  static const double aiWeight = 0.65;
+  static const double chronoWeight = 0.35;
+  static const double maxAiInfluence = 8.0;
   
-  // Штрафы за образ жизни (только + или 0)
   static const Map<String, double> penalties = {
     'smoking': 4.0,
-    'obesity': 3.5,      // BMI > 30
-    'overweight': 1.5,   // BMI 25-30
+    'obesity': 3.5,
+    'overweight': 1.5,
     'low_activity': 2.0,
-    'sleep_less': 2.0,   // < 6 часов
-    'sleep_more': 1.0,   // > 9 часов
+    'sleep_less': 2.0,
+    'sleep_more': 1.0,
     'poor_lighting': 1.5,
   };
 
@@ -59,19 +60,21 @@ class BioAgeCalculator {
     required String activity,
     required int faceAgeEstimate,
     required double faceBrightness,
+    required double rawModelOutput, // ✅ Сырой вывод модели
   }) {
-    print('🤖 [AI] Паспорт: $chronoAge | ИИ-оценка: $faceAgeEstimate | Освещённость: ${(faceBrightness*100).toInt()}%');
+    // ✅ Калибруем возраст модели по паспортному возрасту
+    final calibratedFaceAge = AgeEstimator.calibrateAge(rawModelOutput, chronoAge);
+    
+    print('🤖 [AI] Паспорт: $chronoAge | Калиброванный ИИ: $calibratedFaceAge | Освещённость: ${(faceBrightness*100).toInt()}%');
 
-    // ✅ ИСПРАВЛЕНО: явное приведение к double, убирает красную подсветку
-    double rawDiff = (faceAgeEstimate - chronoAge).toDouble();
+    // Используем калиброванное значение в формуле (вместо faceAgeEstimate)
+    double rawDiff = (calibratedFaceAge - chronoAge).toDouble();
     double clampedAiDiff = rawDiff.clamp(-maxAiInfluence, maxAiInfluence);
     print('🤖 [AI] Сырая разница: $rawDiff → Ограничена до: $clampedAiDiff');
 
-    // Базовый возраст: ИИ + паспорт (пропорционально весам)
     double baseAge = chronoAge + (clampedAiDiff * aiWeight);
-    print('🤖 [BASE] Итог ИИ-влияния: ${baseAge.toStringAsFixed(1)} лет');
+    print(' [BASE] Итог ИИ-влияния: ${baseAge.toStringAsFixed(1)} лет');
 
-    // Штрафы за образ жизни (ТОЛЬКО + или 0)
     double lifestylePenalty = 0.0;
     double bmi = weightKg / ((heightCm / 100) * (heightCm / 100));
 
@@ -84,15 +87,13 @@ class BioAgeCalculator {
     if (faceBrightness < 0.25 || faceBrightness > 0.85) {
       lifestylePenalty += penalties['poor_lighting']!;
     }
-    print('🏃 [LIFE] Сумма штрафов: +$lifestylePenalty');
+    print(' [LIFE] Сумма штрафов: +$lifestylePenalty');
 
-    // Финальный расчёт
     double totalBio = baseAge + lifestylePenalty;
     int bioAge = totalBio.round().clamp(16, 95);
     int finalDiff = bioAge - chronoAge;
     print('🧮 [FINAL] Био: $bioAge | Разница: $finalDiff');
 
-    // Уровень риска и рекомендации
     String riskLevel;
     List<String> recommendations = [];
 
@@ -130,6 +131,7 @@ class BioAgeCalculator {
       bmi: bmi,
       activity: activity,
       sleepHours: sleepHours,
+      calibratedFaceAge: calibratedFaceAge, // ✅ Передаём калиброванное значение
     );
   }
 }
