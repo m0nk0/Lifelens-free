@@ -13,15 +13,15 @@ class WelcomeScreen extends StatelessWidget {
     // 📐 Четкое разделение: Телефон или Планшет
     final isTablet = size.width > 600;
     
-    //  Настройка размеров в зависимости от устройства
-    final titleSize = isTablet ? 48.0 : 28.0;       // Заголовок
-    final subtitleSize = isTablet ? 20.0 : 14.0;     // Подзаголовок
-    final stepTitleSize = isTablet ? 24.0 : 16.0;    // Шаги (заголовки)
-    final stepDescSize = isTablet ? 16.0 : 12.0;     // Шаги (описание)
-    final buttonSize = isTablet ? 20.0 : 16.0;       // Кнопка
-    final iconSize = isTablet ? 64.0 : 40.0;         // Иконка сверху
+    // Настройка размеров в зависимости от устройства
+    final titleSize = isTablet ? 48.0 : 28.0;
+    final subtitleSize = isTablet ? 20.0 : 14.0;
+    final stepTitleSize = isTablet ? 24.0 : 16.0;
+    final stepDescSize = isTablet ? 16.0 : 12.0;
+    final buttonSize = isTablet ? 20.0 : 16.0;
+    final iconSize = isTablet ? 64.0 : 40.0;
     
-    final padding = isTablet ? 40.0 : 20.0;          // Отступы по краям
+    final padding = isTablet ? 40.0 : 20.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F1115),
@@ -71,7 +71,30 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+
+                // 🏷️ Бейдж "Бесплатная версия"
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D4AA).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF00D4AA).withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: const Text(
+                    'FREE VERSION',
+                    style: TextStyle(
+                      color: Color(0xFF00D4AA),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2.0,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
 
                 // 📝 Подзаголовок
                 Text(
@@ -86,23 +109,59 @@ class WelcomeScreen extends StatelessWidget {
 
                 SizedBox(height: isTablet ? 40 : 28),
 
-                // 1️⃣ Шаг 1
-                _buildStep('1', 'Сканирование лица', 'ИИ-камера анализирует микрорельеф кожи, тонус мышц и маркеры усталости', stepTitleSize, stepDescSize, isTablet),
+                // ✅ Шаг 1 (доступен)
+                _buildStep(
+                  '1', 
+                  'Сканирование лица', 
+                  'ИИ-камера анализирует микрорельеф кожи, тонус мышц и маркеры усталости', 
+                  stepTitleSize, 
+                  stepDescSize, 
+                  isTablet,
+                  isLocked: false,
+                ),
                 SizedBox(height: isTablet ? 20 : 14),
 
-                // 2️⃣ Шаг 2
-                _buildStep('2', 'Анкета здоровья', 'Учтём ваш образ жизни, качество сна, вес и уровень физической активности', stepTitleSize, stepDescSize, isTablet),
+                // ✅ Шаг 2 (доступен)
+                _buildStep(
+                  '2', 
+                  'Анкета здоровья', 
+                  'Учтём ваш образ жизни, качество сна, вес и уровень физической активности', 
+                  stepTitleSize, 
+                  stepDescSize, 
+                  isTablet,
+                  isLocked: false,
+                ),
                 SizedBox(height: isTablet ? 20 : 14),
 
-                // 3️ Шаг 3
-                _buildStep('3', 'Прогноз и рекомендации', 'Рассчитаем биологический возраст, вероятность долголетия и дадим персональный план', stepTitleSize, stepDescSize, isTablet),
+                // 🔒 Шаг 3 (Главный крючок - Долголетие)
+                _buildStep(
+                  '3', 
+                  'Прогноз долголетия', 
+                  'Узнайте вашу ожидаемую продолжительность жизни с точностью до года', 
+                  stepTitleSize, 
+                  stepDescSize, 
+                  isTablet,
+                  isLocked: true,
+                ),
+                SizedBox(height: isTablet ? 20 : 14),
+
+                // 🔒 Шаг 4 (Главный крючок - Омоложение)
+                _buildStep(
+                  '4', 
+                  'План продления жизни', 
+                  'Персональные рекомендации от ИИ: как вернуть биологическую молодость', 
+                  stepTitleSize, 
+                  stepDescSize, 
+                  isTablet,
+                  isLocked: true,
+                ),
 
                 SizedBox(height: isTablet ? 40 : 28),
 
                 // 🚀 Кнопка "Начать анализ"
                 SizedBox(
                   width: double.infinity,
-                  height: isTablet ? 65.0 : 50.0, // Высота кнопки
+                  height: isTablet ? 65.0 : 50.0,
                   child: ElevatedButton.icon(
                     onPressed: () {
                       final selectedCamera = cameras.firstWhere(
@@ -141,7 +200,7 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStep(String num, String title, String desc, double titleSize, double descSize, bool isTablet) {
+  Widget _buildStep(String num, String title, String desc, double titleSize, double descSize, bool isTablet, {bool isLocked = false}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -149,41 +208,78 @@ class WelcomeScreen extends StatelessWidget {
           width: isTablet ? 50.0 : 36.0,
           height: isTablet ? 50.0 : 36.0,
           decoration: BoxDecoration(
-            color: const Color(0xFF00D4AA),
+            color: isLocked ? Colors.grey[800] : const Color(0xFF00D4AA),
             borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.center,
-          child: Text(
-            num,
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: isTablet ? 24.0 : 16.0,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          child: isLocked
+              ? Icon(Icons.lock_outline, color: Colors.grey[500], size: isTablet ? 24.0 : 16.0)
+              : Text(
+                  num,
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: isTablet ? 24.0 : 16.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
         ),
         SizedBox(width: isTablet ? 20 : 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: titleSize,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: isLocked ? Colors.grey[600] : Colors.white,
+                        fontSize: titleSize,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (isLocked)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'СКОРО',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 3),
               Text(
                 desc,
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: isLocked ? Colors.grey[700] : Colors.grey[500],
                   fontSize: descSize,
                   height: 1.3,
                 ),
               ),
+              if (isLocked)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '🔒 В следующем обновлении',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: descSize * 0.9,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

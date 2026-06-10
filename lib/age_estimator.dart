@@ -89,7 +89,7 @@ class AgeEstimator {
     return rawOutput;
   }
 
-  /// ✅ Калибровка вывода модели по возрастным группам
+    /// ✅ Калибровка вывода модели по возрастным группам
   static int calibrateAge(double rawModelOutput, int userAge) {
     // Модель возвращает нормализованное значение [0, 1]
     int modelAge = (rawModelOutput * 100).round();
@@ -98,29 +98,36 @@ class AgeEstimator {
     
     int calibratedAge;
     
-    if (userAge <= 40) {
-      // До 40 лет: используем значение модели, но не более ±5 лет от паспорта
-      calibratedAge = modelAge;
+    if (userAge <= 30) {
+      // 20-30 лет: накидываем 2 года
+      calibratedAge = modelAge + 2;
+      final maxDiff = 5;
+      if ((calibratedAge - userAge).abs() > maxDiff) {
+        calibratedAge = userAge + (calibratedAge > userAge ? maxDiff : -maxDiff);
+      }
+    } else if (userAge <= 40) {
+      // 31-40 лет: накидываем 3 года
+      calibratedAge = modelAge + 3;
       final maxDiff = 5;
       if ((calibratedAge - userAge).abs() > maxDiff) {
         calibratedAge = userAge + (calibratedAge > userAge ? maxDiff : -maxDiff);
       }
     } else if (userAge <= 50) {
-      // 40-50 лет: накидываем 5 лет
-      calibratedAge = modelAge + 5;
+      // 41-50 лет: накидываем 7 лет
+      calibratedAge = modelAge + 7;
       final maxDiff = 5;
       if ((calibratedAge - userAge).abs() > maxDiff) {
         calibratedAge = userAge + (calibratedAge > userAge ? maxDiff : -maxDiff);
       }
     } else if (userAge <= 60) {
-      // 50-60 лет: накидываем 10 лет
+      // 51-60 лет: накидываем 10 лет
       calibratedAge = modelAge + 10;
       final maxDiff = 5;
       if ((calibratedAge - userAge).abs() > maxDiff) {
         calibratedAge = userAge + (calibratedAge > userAge ? maxDiff : -maxDiff);
       }
     } else if (userAge <= 70) {
-      // 60-70 лет: накидываем 15 лет
+      // 61-70 лет: накидываем 15 лет
       calibratedAge = modelAge + 15;
       final maxDiff = 5;
       if ((calibratedAge - userAge).abs() > maxDiff) {
@@ -138,7 +145,6 @@ class AgeEstimator {
     debugPrint('✅ Калиброванный возраст: $calibratedAge лет (паспорт: $userAge)');
     return calibratedAge.clamp(16, 95);
   }
-
   /// Расчёт яркости лица (0.0 - 1.0)
   static Future<double> getFaceBrightness(File imageFile, List<double> box) async {
     final original = img.decodeImage(imageFile.readAsBytesSync())!;

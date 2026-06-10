@@ -74,7 +74,7 @@ class _HealthFormState extends State<HealthForm> {
             children: [
               _buildSection("👤 Основные данные", sectionSize),
               
-              _buildStepper(
+                            _buildStepper(
                 "Возраст", 
                 _age, 
                 18, 80, 
@@ -83,7 +83,7 @@ class _HealthFormState extends State<HealthForm> {
                 isTablet, valueSize, iconSize
               ),
               Padding(
-                padding: EdgeInsets.only(left: isTablet ? 40 : 20, bottom: 16),
+                padding: EdgeInsets.only(left: isTablet ? 40 : 20, bottom: 8),
                 child: Text(
                   'Это нужно для расчета реальной разницы с биологическим возрастом и оценки вероятной продолжительности жизни.',
                   style: TextStyle(
@@ -94,7 +94,36 @@ class _HealthFormState extends State<HealthForm> {
                   ),
                 ),
               ),
-
+              // ⚠️ ПРЕДУПРЕЖДЕНИЕ О НЕКОРРЕКТНОМ ВОЗРАСТЕ
+              Padding(
+                padding: EdgeInsets.only(left: isTablet ? 40 : 20, bottom: 16),
+                child: Container(
+                  padding: EdgeInsets.all(isTablet ? 12 : 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange, size: isTablet ? 20 : 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Важно: указывайте реальный возраст. При некорректном вводе (например, вам 40, а вы указали 20) AI получает отрицательные значения и выдаёт недостоверные результаты.',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontSize: isTablet ? 13 : 11,
+                            height: 1.3,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               _buildLabel("Пол", sectionSize),
               Row(
                 children: [

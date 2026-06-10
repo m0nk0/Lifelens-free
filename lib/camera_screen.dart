@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'health_form.dart';
-import 'history_screen.dart';
+
 import 'age_estimator.dart';
-import 'recommendations_screen.dart';
+
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -342,61 +342,27 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
               ),
             ),
           
-          // 🔘 3 КНОПКИ СНИЗУ
-          Positioned(
-            bottom: isPhone ? 24 : 50,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // 1. История
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => HistoryScreen()),
-                  ),
-                  icon: const Icon(Icons.history, color: Color(0xFF00D4AA)),
-                  label: const Text("История", style: TextStyle(color: Color(0xFF00D4AA))),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF00D4AA)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
-                  ),
-                ),
-                
-                // 2. Пропустить
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => RecommendationsScreen(result: null)),
-                  ),
-                  icon: const Icon(Icons.forward, color: Color(0xFF00D4AA)),
-                  label: const Text("Пропустить", style: TextStyle(color: Color(0xFF00D4AA))),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF00D4AA)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
-                  ),
-                ),
-
-                // 3. Анализ (Главная кнопка)
-                ElevatedButton.icon(
-                  onPressed: _isProcessing ? null : _analyzeFace,
-                  icon: Icon(
-                    _isProcessing ? Icons.hourglass_empty : Icons.health_and_safety,
-                    color: Colors.black,
-                  ),
-                  label: Text(
-                    _isProcessing ? "Анализ..." : "Оценить",
-                    style: const TextStyle(color: Colors.black),
+                        //  КНОПКА "Оценить" (скрывается во время сканирования)
+          if (!_isProcessing && !_isScanning)
+            Positioned(
+              bottom: isPhone ? 24 : 50,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ElevatedButton.icon(
+                  onPressed: _analyzeFace,
+                  icon: const Icon(Icons.health_and_safety, color: Colors.black),
+                  label: const Text(
+                    "Оценить",
+                    style: TextStyle(color: Colors.black),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00D4AA),
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 16.0),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
         ],
       ),
       ),
