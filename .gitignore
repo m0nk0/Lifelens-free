@@ -1,14 +1,22 @@
 # Flutter/Dart
 .dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
 .packages
+.pub-cache/
 build/
 pubspec.lock
+*.apk
+*.aab
+*.ap_
+*.dex
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.iml
 
 # OS
 .DS_Store
@@ -18,16 +26,22 @@ Thumbs.db
 *.jks
 *.keystore
 local.properties
+.gradle/
+**/android/.gradle/
+**/android/**/GeneratedPluginRegistrant.java
 
 # iOS
 ios/Pods/
 ios/.symlinks/
 ios/Flutter/App.framework
 ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
 
-# Misc
-*.iml
-*.log
-
+# Keys (КРИТИЧНО!)
 android/key.properties
 android/app/lifelens-release-key.jks
+upload-keystore.jks
+
+# Logs
+*.log
