@@ -13,8 +13,9 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.lifelens"
+    namespace = "com.lifelens.app"  // ✅ ИСПРАВЛЕНО: совпадает с applicationId
     compileSdk = 36
+    ndkVersion = "28.2.13676358"     // ✅ ДОБАВЛЕНО: требуется плагином jni
     
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -29,7 +30,7 @@ android {
     }
     
     defaultConfig {
-        applicationId = "com.example.lifelens"
+        applicationId = "com.lifelens.app"
         minSdk = flutter.minSdkVersion
         targetSdk = 34
         versionCode = 1
@@ -40,7 +41,7 @@ android {
         }
     }
     
-      signingConfigs {
+    signingConfigs {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"] as String
             keyPassword = keystoreProperties["keyPassword"] as String

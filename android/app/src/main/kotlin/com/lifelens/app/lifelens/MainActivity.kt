@@ -1,4 +1,4 @@
-package com.example.lifelens
+package com.lifelens.app
 
 import io.flutter.embedding.android.FlutterActivity
 

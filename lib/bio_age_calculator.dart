@@ -1,4 +1,5 @@
-import 'age_estimator.dart'; // ✅ Импорт для калибровки
+import 'dart:math'; // ✅ Добавлено для микро-вариативности
+import 'age_estimator.dart';
 
 class BioAgeResult {
   final int biologicalAge;
@@ -13,7 +14,7 @@ class BioAgeResult {
   final String activity;
   final int sleepHours;
   
-  final int calibratedFaceAge; // ✅ Калиброванный возраст модели (для плашки)
+  final int calibratedFaceAge;
 
   BioAgeResult({
     required this.biologicalAge,
@@ -31,7 +32,7 @@ class BioAgeResult {
 }
 
 class BioAgeCalculator {
-  static const double aiWeight = 0.65;
+  static const double aiWeight = 0.85;
   static const double chronoWeight = 0.35;
   static const double maxAiInfluence = 8.0;
   
@@ -60,14 +61,13 @@ class BioAgeCalculator {
     required String activity,
     required int faceAgeEstimate,
     required double faceBrightness,
-    required double rawModelOutput, // ✅ Сырой вывод модели
+    required double rawModelOutput,
   }) {
-    // ✅ Калибруем возраст модели по паспортному возрасту
+    // ✅ Калибруем возраст модели по паспортному возрасту (ограничение ±5 лет внутри)
     final calibratedFaceAge = AgeEstimator.calibrateAge(rawModelOutput, chronoAge);
     
     print('🤖 [AI] Паспорт: $chronoAge | Калиброванный ИИ: $calibratedFaceAge | Освещённость: ${(faceBrightness*100).toInt()}%');
 
-    // Используем калиброванное значение в формуле (вместо faceAgeEstimate)
     double rawDiff = (calibratedFaceAge - chronoAge).toDouble();
     double clampedAiDiff = rawDiff.clamp(-maxAiInfluence, maxAiInfluence);
     print('🤖 [AI] Сырая разница: $rawDiff → Ограничена до: $clampedAiDiff');
@@ -91,8 +91,36 @@ class BioAgeCalculator {
 
     double totalBio = baseAge + lifestylePenalty;
     int bioAge = totalBio.round().clamp(16, 95);
+
+    // ✅ ДИНАМИЧЕСКИЙ ПРЕДЕЛ
+    int minAge = chronoAge - 5; // Всегда -5 от паспорта
+    int maxAge;
+    if (lifestylePenalty <= 2.0) {
+      maxAge = chronoAge + 5;
+    } else if (lifestylePenalty <= 5.0) {
+      maxAge = chronoAge + 6;
+    } else {
+      maxAge = chronoAge + 7;
+    }
+
+    int originalBio = bioAge;
+
+    // Применяем предел
+    bioAge = bioAge.clamp(minAge, maxAge);
+
+    // ✅ МИКРО-ВАРИАТИВНОСТЬ: срабатывает ~1 раз из 3 сканов (33% вероятность)
+    if (Random().nextInt(100) < 33) {
+      int microVariation = Random().nextBool() ? 1 : -1;
+      bioAge = (bioAge + microVariation).clamp(minAge, maxAge);
+      print('🎲 [MICRO VARIATION] Микро-колебание: $microVariation → $bioAge');
+    }
+
+    if (originalBio != bioAge) {
+      print('🔒 [FINAL LIMIT] Ограничение: $originalBio → $bioAge (предел: $minAge до $maxAge, штрафы: +${lifestylePenalty.toStringAsFixed(1)})');
+    }
+
     int finalDiff = bioAge - chronoAge;
-    print('🧮 [FINAL] Био: $bioAge | Разница: $finalDiff');
+    print('🧮 [FINAL] Био: $bioAge | Разница: $finalDiff | Предел: $minAge до $maxAge');
 
     String riskLevel;
     List<String> recommendations = [];
@@ -131,7 +159,7 @@ class BioAgeCalculator {
       bmi: bmi,
       activity: activity,
       sleepHours: sleepHours,
-      calibratedFaceAge: calibratedFaceAge, // ✅ Передаём калиброванное значение
+      calibratedFaceAge: calibratedFaceAge,
     );
   }
 }

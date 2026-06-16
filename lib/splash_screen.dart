@@ -25,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // ⏱️ Увеличили длительность до 5 секунд
+    // ⏱️ Длительность 5 секунд
     _controller = AnimationController(
       duration: const Duration(milliseconds: 5000),
       vsync: this,
@@ -123,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 🖼️ Логотип (увеличен: 270 -> 320)
+              // 🖼️ Логотип
               ScaleTransition(
                 scale: _scaleLogo,
                 child: Container(
@@ -138,22 +138,22 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   child: Image.asset(
                     'assets/image/splash_logo.png',
-                    width: 320, // ✅ Было 270
+                    width: 320,
                     height: 320,
                     fit: BoxFit.contain,
                   ),
                 ),
               ),
-              const SizedBox(height: 40), // ✅ Было 32
+              const SizedBox(height: 40),
 
-              // 📛 Название (увеличено: 48 -> 64)
+              // 📛 Название
               FadeTransition(
                 opacity: _fadeText,
                 child: const Text(
-                  'LifeLens',
+                  'LifeLens AI',
                   style: TextStyle(
                     color: Color(0xFF00D4AA),
-                    fontSize: 64, // ✅ Было 48 (в 2 раза больше оригинала 34)
+                    fontSize: 64,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 4.0,
                     height: 1.1,
@@ -163,17 +163,17 @@ class _SplashScreenState extends State<SplashScreen>
 
               const SizedBox(height: 16),
 
-              // 🔤 Подзаголовок (увеличено: 18 -> 24)
+              // 🔤 Подзаголовок
               FadeTransition(
                 opacity: _fadeSubtitle,
                 child: SlideTransition(
                   position: _slideSubtitle,
                   child: const Text(
-                    'AI Biological Age Scanner',
+                    'Биологический сканер',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white54,
-                      fontSize: 24, // ✅ Было 18 (в 2 раза больше оригинала 14)
+                      fontSize: 24,
                       letterSpacing: 2.0,
                       fontWeight: FontWeight.w300,
                     ),
@@ -183,7 +183,7 @@ class _SplashScreenState extends State<SplashScreen>
 
               const SizedBox(height: 24),
 
-              // 💬 Слоган (НОВЫЙ ЭЛЕМЕНТ)
+              // 💬 Слоган (✅ ИСПРАВЛЕНО: более мягкая формулировка)
               FadeTransition(
                 opacity: _fadeSlogan,
                 child: Container(
@@ -199,7 +199,7 @@ class _SplashScreenState extends State<SplashScreen>
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
-                    'Ты можешь узнать\nсвой реальный возраст',
+                    'Узнай свой\nбиологический возраст',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF00D4AA),
@@ -207,6 +207,36 @@ class _SplashScreenState extends State<SplashScreen>
                       fontWeight: FontWeight.w500,
                       letterSpacing: 1.0,
                       height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 🏷️ Бейдж "БЕСПЛАТНАЯ ВЕРСИЯ" (✅ НОВЫЙ ЭЛЕМЕНТ)
+              FadeTransition(
+                opacity: _fadeSlogan,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D4AA).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF00D4AA).withOpacity(0.4),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Text(
+                    'БЕСПЛАТНАЯ ВЕРСИЯ',
+                    style: TextStyle(
+                      color: Color(0xFF00D4AA),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2.0,
                     ),
                   ),
                 ),
@@ -221,8 +251,8 @@ class _SplashScreenState extends State<SplashScreen>
                   animation: _pulseProgress,
                   builder: (context, child) {
                     return Container(
-                      width: 200 * _pulseProgress.value, // ✅ Расширяется
-                      height: 6, // ✅ Было 2 (в 3 раза толще)
+                      width: 200 * _pulseProgress.value,
+                      height: 6,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
                         gradient: const LinearGradient(

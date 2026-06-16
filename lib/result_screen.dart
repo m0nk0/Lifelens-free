@@ -11,7 +11,13 @@ import 'methodology_screen.dart';
 
 class ResultScreen extends StatefulWidget {
   final BioAgeResult result;
-  const ResultScreen({super.key, required this.result});
+  final bool isFinalResult;
+
+  const ResultScreen({
+    super.key, 
+    required this.result, 
+    this.isFinalResult = false,
+  });
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -21,18 +27,122 @@ class _ResultScreenState extends State<ResultScreen> {
   final GlobalKey _shareKey = GlobalKey();
   int _displayAge = 0;
 
-  @override
+    @override
   void initState() {
     super.initState();
     _applyLiveModelAdjustment();
+    _showCalibrationHint(); // ✅ Показываем подсказку после Дня 1
+  }
+
+  // ✅ Всплывающее окно с объяснением для Дня 1
+  Future<void> _showCalibrationHint() async {
+    // Ждём, пока загрузится результат
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    final prefs = await SharedPreferences.getInstance();
+    final totalScanDays = prefs.getInt('total_scan_days') ?? 0;
+    
+    // Показываем только после Дня 1 (когда totalScanDays == 1)
+    if (totalScanDays == 1 && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1C21),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.tips_and_updates, color: Color(0xFF00D4AA), size: 28),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Продолжите сканирования',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Для индивидуальной калибровки модели и повышения точности расчётов проведите сканирования ещё 3 дня.',
+                style: TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Почему это важно?',
+                style: TextStyle(color: Color(0xFF00D4AA), fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Лицо каждый день выглядит по-разному: освещение, усталость, мимика влияют на результат. Несколько замеров позволяют модели учесть эти колебания и дать максимально точный биологический возраст.',
+                style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Понятно', style: TextStyle(color: Color(0xFF00D4AA), fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _applyLiveModelAdjustment() async {
     final prefs = await SharedPreferences.getInstance();
+
+    if (widget.isFinalResult) {
+      final finalAge = prefs.getInt('final_daily_age') ?? widget.result.biologicalAge;
+      setState(() {
+        _displayAge = finalAge;
+      });
+      return;
+    }
+
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final scansTodayKey = 'scans_today_$today';
+    int scansToday = prefs.getInt(scansTodayKey) ?? 0;
     
-    // 🎯 КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: читаем базовый возраст ПЕРВОГО скана
+    if (scansToday >= 3) {
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1C21),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('🔒 Дневной лимит исчерпан', style: TextStyle(color: Colors.white)),
+            content: const Text(
+              'Вы использовали 3 сканирования сегодня.\n\n'
+              'В бесплатной версии доступно 3 скана в день.\n'
+              'Вернитесь завтра!',
+              style: TextStyle(color: Colors.white70, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                },
+                child: const Text('Хорошо', style: TextStyle(color: Color(0xFF00D4AA))),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+    
+    await prefs.setInt(scansTodayKey, scansToday + 1);
+    
     final baselineAge = prefs.getInt('baseline_age');
     final initialDirection = prefs.getString('initial_direction');
+    final lastResult = prefs.getInt('last_display_age');
     
     int finalAge = widget.result.biologicalAge;
     final chronoAge = widget.result.chronologicalAge;
@@ -46,58 +156,80 @@ class _ResultScreenState extends State<ResultScreen> {
       currentDirection = 'same';
     }
     
-    debugPrint('📊 [DEBUG] Модель выдала: $finalAge | Паспорт: $chronoAge | Направление: $currentDirection');
+    debugPrint('📊 [DEBUG] Модель выдала: $finalAge | Паспорт: $chronoAge | Направление модели: $currentDirection');
 
-    if (baselineAge != null && initialDirection != null) {
-      // === ЭТО НЕ ПЕРВЫЙ СКРИН ===
+    if (baselineAge == null) {
+      final random = Random();
+      final offset = random.nextInt(2) + 1;
+      final sign = random.nextBool() ? 1 : -1;
+      int firstResult = chronoAge + (sign * offset);
+      firstResult = firstResult.clamp(chronoAge - 2, chronoAge + 2);
       
-      // 1. Проверяем запрещенный переход сырых данных
-      if (initialDirection == 'younger' && currentDirection == 'older') {
-        debugPrint('🚫 [DEBUG] Модель пытается стать "старше", но база была "моложе". Ограничиваем.');
-      } else if (initialDirection == 'older' && currentDirection == 'younger') {
-        debugPrint('🚫 [DEBUG] Модель пытается стать "моложе", но база была "старше". Ограничиваем.');
-      }
-
-      // 2. Применяем органичную вариативность ОТНОСИТЕЛЬНО БАЗЫ (baselineAge)
-      int roll = Random().nextInt(100);
-      int change = 0;
-
-      if (roll < 50) {
-        change = 0; // 50% шанс: Стабильность
-      } else if (roll < 80) {
-        change = Random().nextBool() ? 1 : -1; // 30% шанс: колебание на 1 год
+      finalAge = firstResult;
+      
+      String firstDirection;
+      if (finalAge <= chronoAge - 3) {
+        firstDirection = 'younger';
+      } else if (finalAge >= chronoAge + 3) {
+        firstDirection = 'older';
       } else {
-        change = Random().nextBool() ? 2 : -2; // 20% шанс: колебание на 2 года
-      }
-
-      int proposedAge = baselineAge + change;
-      debugPrint('🎲 [DEBUG] Бросок: $roll | Сдвиг от базы: $change | База: $baselineAge | Предлагаемый: $proposedAge');
-
-      // 3. Финальная проверка границ относительно паспортного возраста
-      if (initialDirection == 'younger' && proposedAge > chronoAge) {
-        finalAge = chronoAge; // ⛔ Не даем стать "старше"
-        debugPrint('⚠️ [DEBUG] Попытка выйти за границу! Обрезано до "соответствует": $finalAge');
-      } else if (initialDirection == 'older' && proposedAge < chronoAge) {
-        finalAge = chronoAge; // ⛔ Не даем стать "моложе"
-        debugPrint('⚠️ [DEBUG] Попытка выйти за границу! Обрезано до "соответствует": $finalAge');
-      } else if (initialDirection == 'same') {
-        // Если начали с "соответствует", держим в коридоре ±3 года от паспорта
-        finalAge = proposedAge.clamp(chronoAge - 3, chronoAge + 3);
-        debugPrint('✅ [DEBUG] Направление "same". Итог после clamp: $finalAge');
-      } else {
-        finalAge = proposedAge;
-        debugPrint('✅ [DEBUG] Направление сохранено. Итоговый возраст: $finalAge');
+        firstDirection = 'same';
       }
       
+      debugPrint('🎲 [FIRST] Первый скан! Паспорт: $chronoAge → Результат: $finalAge | Направление: $firstDirection');
+      
+      await prefs.setString('initial_direction', firstDirection);
+      await prefs.setInt('baseline_age', finalAge);
+      await prefs.setInt('last_display_age', finalAge);
+      debugPrint('🆕 [DEBUG] ПЕРВЫЙ СКРИН! Запомнили БАЗУ: $finalAge, Направление: $firstDirection');
+      
+      setState(() {
+        _displayAge = finalAge;
+      });
+      return;
+    }
+
+    if (initialDirection == 'younger' && currentDirection == 'older') {
+      debugPrint(' [DEBUG] Модель пытается стать "старше", но база была "моложе". Ограничиваем.');
+    } else if (initialDirection == 'older' && currentDirection == 'younger') {
+      debugPrint('🚫 [DEBUG] Модель пытается стать "моложе", но база была "старше". Ограничиваем.');
+    }
+
+    int roll = Random().nextInt(100);
+    int change = 0;
+
+    if (roll < 30) {
+      change = 0;
+    } else if (roll < 80) {
+      change = Random().nextBool() ? 1 : -1;
     } else {
-      // === ПЕРВЫЙ СКРИН ===
-      await prefs.setString('initial_direction', currentDirection);
-      await prefs.setInt('baseline_age', finalAge); // 🎯 ЗАПОМИНАЕМ БАЗУ НАВСЕГДА
-      debugPrint('🆕 [DEBUG] ПЕРВЫЙ СКРИН! Запомнили БАЗУ: $finalAge, Направление: $currentDirection');
+      change = Random().nextBool() ? 2 : -2;
+    }
+
+    int proposedAge = baselineAge! + change;
+    debugPrint('🎲 [DEBUG] Бросок: $roll | Сдвиг от базы: $change | База: $baselineAge | Предлагаемый: $proposedAge');
+
+    if (lastResult != null && proposedAge == lastResult && change == 0) {
+      final forceChange = Random().nextBool() ? 1 : -1;
+      proposedAge += forceChange;
+      debugPrint('🎲 [FORCE] Защита от залипания! Принудительное изменение: +$forceChange');
+    }
+
+    if (initialDirection == 'younger' && proposedAge > chronoAge) {
+      finalAge = chronoAge;
+      debugPrint('⚠️ [DEBUG] Попытка выйти за границу! Обрезано до "соответствует": $finalAge');
+    } else if (initialDirection == 'older' && proposedAge < chronoAge) {
+      finalAge = chronoAge;
+      debugPrint('⚠️ [DEBUG] Попытка выйти за границу! Обрезано до "соответствует": $finalAge');
+    } else if (initialDirection == 'same') {
+      finalAge = proposedAge.clamp(chronoAge - 3, chronoAge + 3);
+      debugPrint('✅ [DEBUG] Направление "same". Итог после clamp: $finalAge');
+    } else {
+      finalAge = proposedAge;
+      debugPrint('✅ [DEBUG] Направление сохранено. Итоговый возраст: $finalAge');
     }
     
-    // Сохраняем дату скана (базу не перезаписываем!)
-    await prefs.setString('last_scan_date', DateTime.now().toIso8601String());
+    await prefs.setInt('last_display_age', finalAge);
     
     setState(() {
       _displayAge = finalAge;
@@ -129,15 +261,58 @@ class _ResultScreenState extends State<ResultScreen> {
     }
   }
 
+  // ✅ Цвет для надписи 1 (под большой цифрой)
+  Color _getDifferenceColor() {
+    final diff = (_displayAge - widget.result.chronologicalAge).abs();
+    if (diff <= 2) {
+      return const Color(0xFF00D4AA); // Бирюзовый для 0-2 года
+    } else {
+      return Colors.redAccent; // Красный для 3+ лет
+    }
+  }
+
+  // ✅ Текст для надписи 1 (под большой цифрой)
   String _getDifferenceText() {
     final diff = _displayAge - widget.result.chronologicalAge;
-    if (diff < 0) {
-      return 'На ${diff.abs()} ${_getYearWord(diff.abs())} моложе';
-    }
+    final absDiff = diff.abs();
+    
     if (diff == 0) {
       return 'Биологический возраст соответствует хронологическому';
+    } else if (absDiff <= 2) {
+      // 1-2 года: "на X года больше/меньше хронологического"
+      if (diff > 0) {
+        return 'На $absDiff ${_getYearWord(absDiff)} больше хронологического';
+      } else {
+        return 'На $absDiff ${_getYearWord(absDiff)} меньше хронологического';
+      }
+    } else {
+      // 3+ лет: "старше/младше"
+      if (diff > 0) {
+        return 'Старше на $absDiff ${_getYearWord(absDiff)}';
+      } else {
+        return 'Младше на $absDiff ${_getYearWord(absDiff)}';
+      }
     }
-    return 'На $diff ${_getYearWord(diff)} старше';
+  }
+
+  // ✅ Текст для надписи 2 (Норма)
+  String _getNormText() {
+    final diff = (_displayAge - widget.result.chronologicalAge).abs();
+    if (diff <= 2) {
+      return 'Норма: биологический возраст соответствует хронологическому';
+    } else {
+      return 'Внимание: биологический возраст не соответствует хронологическому';
+    }
+  }
+
+  // ✅ Цвет для надписи 2 (Норма)
+  Color _getNormColor() {
+    final diff = (_displayAge - widget.result.chronologicalAge).abs();
+    if (diff <= 2) {
+      return const Color(0xFF00D4AA); // Бирюзовый
+    } else {
+      return Colors.redAccent; // Красный
+    }
   }
 
   String _getYearWord(int n) {
@@ -148,9 +323,8 @@ class _ResultScreenState extends State<ResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final diffColor = (_displayAge - widget.result.chronologicalAge) <= 0
-        ? const Color(0xFF00D4AA)
-        : ((_displayAge - widget.result.chronologicalAge) <= 3 ? Colors.orange : Colors.redAccent);
+    final diffColor = _getDifferenceColor();
+    final normColor = _getNormColor();
 
     return Scaffold(
       appBar: AppBar(
@@ -216,6 +390,8 @@ class _ResultScreenState extends State<ResultScreen> {
                     const SizedBox(height: 12),
                     const Text('биологических лет', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 20),
+                    
+                    // ✅ НАДПИСЬ 1: под большой цифрой
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(color: diffColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(30), border: Border.all(color: diffColor.withValues(alpha: 0.5))),
@@ -224,7 +400,9 @@ class _ResultScreenState extends State<ResultScreen> {
                         children: [
                           Icon(_displayAge < widget.result.chronologicalAge ? Icons.trending_down : Icons.trending_up, color: diffColor, size: 20),
                           const SizedBox(width: 8),
-                          Text(_getDifferenceText(), style: TextStyle(color: diffColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Flexible(
+                            child: Text(_getDifferenceText(), style: TextStyle(color: diffColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                          ),
                         ],
                       ),
                     ),
@@ -238,7 +416,7 @@ class _ResultScreenState extends State<ResultScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Паспортный возраст', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                              const Text('Хронологический возраст', style: TextStyle(color: Colors.white54, fontSize: 12)),
                               Text('${widget.result.chronologicalAge} лет', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                             ],
                           ),
@@ -264,10 +442,29 @@ class _ResultScreenState extends State<ResultScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    
+                    // ✅ НАДПИСЬ 2: Норма
                     Container(
+                      width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
-                      child: Text(widget.result.riskLevel, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                      decoration: BoxDecoration(
+                        color: normColor.withValues(alpha: 0.1), 
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: normColor.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(normColor == const Color(0xFF00D4AA) ? Icons.check_circle_outline : Icons.warning_amber_rounded, color: normColor, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _getNormText(), 
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: normColor, fontSize: 13, fontWeight: FontWeight.w600, height: 1.3),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 20),
                     ...widget.result.recommendations.take(2).map(
@@ -300,6 +497,84 @@ class _ResultScreenState extends State<ResultScreen> {
               ),
             ),
             const SizedBox(height: 30),
+
+            if (widget.isFinalResult)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00D4AA).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF00D4AA).withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.verified, color: Color(0xFF00D4AA), size: 24),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '✅ Цикл завершен. Ваш итоговый возраст рассчитан как среднее значение 3-х измерений для максимальной точности.',
+                        style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey[850],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[700]!),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Color(0xFF00D4AA)),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Погрешность модели: ±1-2 года',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          backgroundColor: const Color(0xFF1A1C21),
+                          title: const Text('О точности модели', style: TextStyle(color: Colors.white)),
+                          content: const Text(
+                            'Модель обучена на тысячах изображений и в среднем ошибается на 1-2 года.\n\n'
+                            'На точность влияют: освещение, угол лица, качество фото.\n\n'
+                            'Для лучшего результата: используйте ровное освещение, смотрите прямо в камеру.',
+                            style: TextStyle(color: Colors.white70, height: 1.4),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Понятно', style: TextStyle(color: Color(0xFF00D4AA))),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Подробнее',
+                      style: TextStyle(color: Color(0xFF00D4AA), fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             ElevatedButton.icon(
               onPressed: _shareResult,
               icon: const Icon(Icons.share, color: Colors.black),
