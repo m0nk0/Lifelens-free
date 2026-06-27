@@ -262,12 +262,12 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   // ✅ Цвет для надписи 1 (под большой цифрой)
-  Color _getDifferenceColor() {
-    final diff = (_displayAge - widget.result.chronologicalAge).abs();
-    if (diff <= 2) {
-      return const Color(0xFF00D4AA); // Бирюзовый для 0-2 года
+    Color _getDifferenceColor() {
+    final diff = _displayAge - widget.result.chronologicalAge;
+    if (diff <= 0) {
+      return const Color(0xFF00D4AA); // Бирюзовый: младше или соответствует
     } else {
-      return Colors.redAccent; // Красный для 3+ лет
+      return Colors.redAccent; // Красный: старше
     }
   }
 
@@ -306,12 +306,12 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   // ✅ Цвет для надписи 2 (Норма)
-  Color _getNormColor() {
-    final diff = (_displayAge - widget.result.chronologicalAge).abs();
-    if (diff <= 2) {
-      return const Color(0xFF00D4AA); // Бирюзовый
+    Color _getNormColor() {
+    final diff = _displayAge - widget.result.chronologicalAge;
+    if (diff <= 0) {
+      return const Color(0xFF00D4AA); // Бирюзовый: младше или соответствует
     } else {
-      return Colors.redAccent; // Красный
+      return Colors.redAccent; // Красный: старше
     }
   }
 

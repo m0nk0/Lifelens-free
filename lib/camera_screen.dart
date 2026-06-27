@@ -71,7 +71,6 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
     if (mounted) setState(() {});
   }
 
-  // ✅ Динамический лимит сканов: 3 для дней 1-4, 1 для дня 5+
   Future<int> _getMaxScans() async {
     final prefs = await SharedPreferences.getInstance();
     final totalScanDays = prefs.getInt('total_scan_days') ?? 0;
@@ -139,7 +138,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           builder: (_) => AlertDialog(
             backgroundColor: const Color(0xFF1A1C21),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('🔒 Дневной лимит исчерпан', style: TextStyle(color: Colors.white)),
+            title: const Text(' Дневной лимит исчерпан', style: TextStyle(color: Colors.white)),
             content: const Text(
               'Вы использовали все сканирования на сегодня.\n\n'
               'Модель стабилизирована и запомнила ваш биологический возраст.\n'
@@ -201,7 +200,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
         await prefs.setDouble('last_raw_output', rawModelOutput);
         
       } catch (e) {
-        debugPrint('️ Ошибка инференса: $e');
+        debugPrint('⚠️ Ошибка инференса: $e');
       }
 
       HapticFeedback.lightImpact();
@@ -261,6 +260,10 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
     final size = MediaQuery.of(context).size;
     final isPhone = size.shortestSide < 600;
 
+    // ✅ Динамическое соотношение сторон камеры (portrait)
+    final previewSize = _controller!.value.previewSize!;
+    final previewRatio = previewSize.height / previewSize.width;
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF0F1115), Color(0xFF1A1D24), Color(0x1A00D4AA)])),
@@ -268,19 +271,35 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           fit: StackFit.expand,
           children: [
             _capturedPhoto != null && _isScanning
-                ? Center(child: Transform(alignment: Alignment.center, transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0), child: AspectRatio(aspectRatio: 3 / 4, child: Image.file(File(_capturedPhoto!.path), fit: BoxFit.cover))))
+                ? Center(child: Transform(
+                    alignment: Alignment.center, 
+                    transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0), 
+                    child: AspectRatio(
+                      aspectRatio: previewRatio,
+                      child: Image.file(File(_capturedPhoto!.path), fit: BoxFit.cover),
+                    ),
+                  ))
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      final previewWidth = _controller!.value.previewSize!.height;
-                      final previewHeight = _controller!.value.previewSize!.width;
-                      final previewRatio = previewWidth / previewHeight;
+                      final previewWidth = previewSize.height;
+                      final previewHeight = previewSize.width;
                       final boxRatio = constraints.maxWidth / constraints.maxHeight;
                       double renderWidth, renderHeight;
-                      if (boxRatio > previewRatio) { renderWidth = constraints.maxWidth; renderHeight = constraints.maxWidth / previewRatio; } 
-                      else { renderHeight = constraints.maxHeight; renderWidth = constraints.maxHeight * previewRatio; }
-                      final maxAspectWidth = renderHeight * (3 / 4);
+                      if (boxRatio > previewRatio) { 
+                        renderWidth = constraints.maxWidth; 
+                        renderHeight = constraints.maxWidth / previewRatio; 
+                      } else { 
+                        renderHeight = constraints.maxHeight; 
+                        renderWidth = constraints.maxHeight * previewRatio; 
+                      }
+                      final maxAspectWidth = renderHeight * previewRatio;
                       if (renderWidth > maxAspectWidth) renderWidth = maxAspectWidth;
-                      return Center(child: SizedBox(width: renderWidth, height: renderHeight, child: CameraPreview(_controller!)));
+                      return Center(
+                        child: AspectRatio(
+                          aspectRatio: previewRatio,
+                          child: SizedBox(width: renderWidth, height: renderHeight, child: CameraPreview(_controller!)),
+                        ),
+                      );
                     },
                   ),
             
@@ -291,8 +310,31 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 builder: (ctx, child) {
                   return Stack(children: [
                     Positioned.fill(child: Center(child: CustomPaint(size: isPhone ? Size(size.width * 0.85, size.height * 0.45) : const Size(450, 560), painter: CenteredScannerPainter(isScanning: true, scanProgress: _scanProgress)))),
-                    _TermLog(isScanning: _isScanning, terms: const ["Анализ микрорельефа", "Оценка тургора кожи", "Картирование морщин", "Сканирование радужки", "Анализ сосудистой сетки", "Измерение пигментации", "Детекция маркеров усталости", "Оценка симметрии лица"], side: 'left'),
-                    _TermLog(isScanning: _isScanning, terms: const ["Анализ тонуса мышц", "Расчет индекса гидратации", "Анализ периорбитальной зоны", "Оценка коллагеновой сетки", "Термография тканей", "Анализ микроциркуляции", "Детекция акне-маркеров", "Расчет биометрических точек"], side: 'right'),
+                    Positioned(
+                      bottom: isPhone ? 200 : 240,
+                      left: 20,
+                      right: 20,
+                      child: _ScrollingTerms(
+                        terms: const [
+                          "Анализ микрорельефа",
+                          "Оценка тургора кожи",
+                          "Картирование морщин",
+                          "Сканирование радужки",
+                          "Анализ сосудистой сетки",
+                          "Измерение пигментации",
+                          "Детекция маркеров усталости",
+                          "Оценка симметрии лица",
+                          "Анализ тонуса мышц",
+                          "Расчет индекса гидратации",
+                          "Анализ периорбитальной зоны",
+                          "Оценка коллагеновой сетки",
+                          "Термография тканей",
+                          "Анализ микроциркуляции",
+                          "Детекция акне-маркеров",
+                          "Расчет биометрических точек",
+                        ],
+                      ),
+                    ),
                     Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
                     
                     if (_trainingStatus.isNotEmpty)
@@ -378,6 +420,7 @@ class _TermLog extends StatefulWidget {
   const _TermLog({required this.isScanning, required this.terms, required this.side});
   @override State<_TermLog> createState() => _TermLogState();
 }
+
 class _TermLogState extends State<_TermLog> {
   final List<String> _visible = []; Timer? _timer; int _idx = 0;
   @override void initState() { super.initState(); if (widget.isScanning) _start(); }
@@ -411,6 +454,61 @@ class _TermLogState extends State<_TermLog> {
               ),
             );
           }),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScrollingTerms extends StatefulWidget {
+  final List<String> terms;
+  const _ScrollingTerms({required this.terms});
+  @override State<_ScrollingTerms> createState() => _ScrollingTermsState();
+}
+
+class _ScrollingTermsState extends State<_ScrollingTerms> {
+  int _currentIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (mounted) {
+        setState(() {
+          _currentIndex = (_currentIndex + 1) % widget.terms.length;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: Container(
+        key: ValueKey<int>(_currentIndex),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF00D4AA).withValues(alpha: 0.5), width: 1.5),
+        ),
+        child: Text(
+          widget.terms[_currentIndex],
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFF00D4AA),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
         ),
       ),
     );
